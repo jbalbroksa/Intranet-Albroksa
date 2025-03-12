@@ -1,0 +1,2 @@
+-- No specific tables to remove for activity feed as they were not created yet
+-- This migration file is a placeholder for documentation purposes
