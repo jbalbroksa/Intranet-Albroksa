@@ -5,44 +5,47 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { FileText, Users, BookOpen, Calendar, Activity } from "lucide-react";
+import AlertsSection from "./AlertsSection";
+import RecentDocuments from "./RecentDocuments";
+import FeaturedNews from "../news/FeaturedNews";
+import RecentNews from "../news/RecentNews";
 
 export default function DashboardOverview() {
   const { profile } = useUserProfile();
 
   const stats = [
     {
-      title: "Documents",
-      value: "24",
-      description: "Total documents",
+      title: "Documentos",
+      value: "0",
+      description: "Total documentos",
       icon: <FileText className="h-5 w-5 text-muted-foreground" />,
-      change: "+4 this week",
-      trend: "up",
+      change: "Sin cambios",
+      trend: "neutral",
     },
     {
-      title: "Users",
-      value: "12",
-      description: "Active users",
+      title: "Usuarios",
+      value: "1",
+      description: "Usuarios activos",
       icon: <Users className="h-5 w-5 text-muted-foreground" />,
-      change: "+2 this month",
-      trend: "up",
+      change: "Sin cambios",
+      trend: "neutral",
     },
     {
-      title: "Companies",
-      value: "15",
-      description: "Insurance companies",
+      title: "Compañías",
+      value: "0",
+      description: "Compañías de seguros",
       icon: <BookOpen className="h-5 w-5 text-muted-foreground" />,
-      change: "2 new companies",
-      trend: "up",
+      change: "Sin cambios",
+      trend: "neutral",
     },
     {
-      title: "Events",
-      value: "5",
-      description: "Upcoming events",
+      title: "Eventos",
+      value: "0",
+      description: "Próximos eventos",
       icon: <Calendar className="h-5 w-5 text-muted-foreground" />,
-      change: "Next: July 15",
+      change: "Sin eventos",
       trend: "neutral",
     },
   ];
@@ -56,6 +59,11 @@ export default function DashboardOverview() {
         <p className="text-muted-foreground">
           Here's an overview of your insurance franchise intranet platform
         </p>
+      </div>
+
+      {/* Alertas en la parte superior, en una sola columna */}
+      <div className="w-full">
+        <AlertsSection />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -93,87 +101,15 @@ export default function DashboardOverview() {
         ))}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Card className="col-span-2">
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-            <CardDescription>
-              Recent actions across the platform
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center">
-                <div className="mr-4 rounded-full bg-primary/10 p-2">
-                  <FileText className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 space-y-1">
-                  <p className="text-sm font-medium">
-                    New policy document uploaded
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Sarah Johnson • 2 hours ago
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center">
-                <div className="mr-4 rounded-full bg-primary/10 p-2">
-                  <Users className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 space-y-1">
-                  <p className="text-sm font-medium">
-                    New user account created
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Admin • 5 hours ago
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center">
-                <div className="mr-4 rounded-full bg-primary/10 p-2">
-                  <BookOpen className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 space-y-1">
-                  <p className="text-sm font-medium">
-                    New company specifications added
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Michael Chen • Yesterday
-                  </p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+        <div className="col-span-4 space-y-4">
+          <FeaturedNews />
+        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Links</CardTitle>
-            <CardDescription>Frequently accessed resources</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-2">
-                <Button variant="outline" className="justify-start">
-                  <FileText className="mr-2 h-4 w-4" />
-                  Policy Documents
-                </Button>
-                <Button variant="outline" className="justify-start">
-                  <BookOpen className="mr-2 h-4 w-4" />
-                  Company Specifications
-                </Button>
-                <Button variant="outline" className="justify-start">
-                  <Calendar className="mr-2 h-4 w-4" />
-                  Company Calendar
-                </Button>
-                <Button variant="outline" className="justify-start">
-                  <Users className="mr-2 h-4 w-4" />
-                  Directory
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="col-span-3 space-y-4">
+          <RecentNews />
+          <RecentDocuments />
+        </div>
       </div>
     </div>
   );

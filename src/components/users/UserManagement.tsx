@@ -40,7 +40,7 @@ export const USER_TYPES = [
   "Administrador",
 ];
 
-export default function UserManagement() {
+function UserManagement() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedRole, setSelectedRole] = useState("Todos los roles");
@@ -375,3 +375,5 @@ export default function UserManagement() {
     </div>
   );
 }
+
+export default UserManagement;

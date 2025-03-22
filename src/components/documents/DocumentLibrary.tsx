@@ -14,108 +14,17 @@ import DocumentCard, { DocumentProps } from "./DocumentCard";
 import DocumentUploadDialog from "./DocumentUploadDialog";
 import DocumentViewDialog from "./DocumentViewDialog";
 
-const MOCK_DOCUMENTS: DocumentProps[] = [
-  {
-    id: "1",
-    title: "Insurance Policy Guidelines 2024",
-    description: "Official guidelines for policy creation and management",
-    fileType: "pdf",
-    category: "Policies",
-    uploadedBy: {
-      name: "Sarah Johnson",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah",
-    },
-    uploadedAt: new Date(2024, 2, 15),
-    fileSize: "2.4 MB",
-    version: "1.2",
-    tags: ["guidelines", "policies", "official"],
-  },
-  {
-    id: "2",
-    title: "Franchise Onboarding Checklist",
-    description: "Step-by-step guide for new franchise onboarding",
-    fileType: "docx",
-    category: "Onboarding",
-    uploadedBy: {
-      name: "Michael Chen",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Michael",
-    },
-    uploadedAt: new Date(2024, 3, 5),
-    fileSize: "1.8 MB",
-    version: "2.0",
-    tags: ["onboarding", "checklist", "franchisee"],
-  },
-  {
-    id: "3",
-    title: "Q1 2024 Sales Report",
-    description: "Quarterly sales performance across all franchises",
-    fileType: "xlsx",
-    category: "Reports",
-    uploadedBy: {
-      name: "Jessica Williams",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Jessica",
-    },
-    uploadedAt: new Date(2024, 3, 10),
-    fileSize: "3.2 MB",
-    version: "1.0",
-    tags: ["sales", "quarterly", "reports"],
-  },
-  {
-    id: "4",
-    title: "Marketing Strategy Presentation",
-    description: "2024 marketing strategy for franchise network",
-    fileType: "pptx",
-    category: "Marketing",
-    uploadedBy: {
-      name: "David Rodriguez",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=David",
-    },
-    uploadedAt: new Date(2024, 2, 28),
-    fileSize: "5.7 MB",
-    version: "1.1",
-    tags: ["marketing", "strategy", "presentation"],
-  },
-  {
-    id: "5",
-    title: "Compliance Training Manual",
-    description: "Regulatory compliance training for all staff",
-    fileType: "pdf",
-    category: "Training",
-    uploadedBy: {
-      name: "Amanda Lee",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Amanda",
-    },
-    uploadedAt: new Date(2024, 1, 20),
-    fileSize: "4.1 MB",
-    version: "2.3",
-    tags: ["compliance", "training", "regulatory"],
-  },
-  {
-    id: "6",
-    title: "Customer Service Best Practices",
-    description: "Guide for delivering exceptional customer service",
-    fileType: "docx",
-    category: "Training",
-    uploadedBy: {
-      name: "Robert Kim",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Robert",
-    },
-    uploadedAt: new Date(2024, 3, 2),
-    fileSize: "1.5 MB",
-    version: "1.4",
-    tags: ["customer service", "best practices", "training"],
-  },
-];
+const MOCK_DOCUMENTS: DocumentProps[] = [];
 
 const CATEGORIES = [
-  "All Categories",
-  "Policies",
+  "Todas las Categorías",
+  "Pólizas",
   "Onboarding",
-  "Reports",
+  "Informes",
   "Marketing",
-  "Training",
+  "Formación",
   "Legal",
-  "HR",
+  "RRHH",
 ];
 
 export default function DocumentLibrary() {
@@ -150,9 +59,21 @@ export default function DocumentLibrary() {
     }
   };
 
-  const handleDownloadDocument = (id: string) => {
-    // In a real application, this would trigger a download
-    console.log(`Downloading document with ID: ${id}`);
+  const handleDownloadDocument = (id: string, fileUrl?: string) => {
+    if (fileUrl) {
+      // Create a temporary anchor element to trigger the download
+      const link = document.createElement("a");
+      link.href = fileUrl;
+      link.target = "_blank";
+      link.download = `document-${id}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      console.log(`Downloading document with URL: ${fileUrl}`);
+    } else {
+      // Fallback if no URL is provided
+      console.log(`Downloading document with ID: ${id}`);
+    }
   };
 
   const handleDeleteDocument = (id: string) => {
@@ -167,9 +88,9 @@ export default function DocumentLibrary() {
   return (
     <div className="h-full flex flex-col">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-        <h1 className="text-2xl font-bold">Document Repository</h1>
+        <h1 className="text-2xl font-bold">Repositorio de Documentos</h1>
         <Button onClick={() => setIsUploadDialogOpen(true)}>
-          <FileUp className="mr-2 h-4 w-4" /> Upload Document
+          <FileUp className="mr-2 h-4 w-4" /> Subir Documento
         </Button>
       </div>
 
@@ -177,7 +98,7 @@ export default function DocumentLibrary() {
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search documents..."
+            placeholder="Buscar documentos..."
             className="pl-8"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -186,7 +107,7 @@ export default function DocumentLibrary() {
         <Select value={selectedCategory} onValueChange={setSelectedCategory}>
           <SelectTrigger className="w-full md:w-[200px]">
             <Filter className="mr-2 h-4 w-4" />
-            <SelectValue placeholder="Category" />
+            <SelectValue placeholder="Categoría" />
           </SelectTrigger>
           <SelectContent>
             {CATEGORIES.map((category) => (
@@ -200,16 +121,16 @@ export default function DocumentLibrary() {
 
       <Tabs defaultValue="all" className="flex-1">
         <TabsList className="mb-4">
-          <TabsTrigger value="all">All Documents</TabsTrigger>
-          <TabsTrigger value="recent">Recently Added</TabsTrigger>
-          <TabsTrigger value="favorites">Favorites</TabsTrigger>
+          <TabsTrigger value="all">Todos los Documentos</TabsTrigger>
+          <TabsTrigger value="recent">Añadidos Recientemente</TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="flex-1">
           {filteredDocuments.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-muted-foreground">
-                No documents found. Try adjusting your search or filters.
+                No se encontraron documentos. Intente ajustar su búsqueda o
+                filtros.
               </p>
             </div>
           ) : (
@@ -243,14 +164,6 @@ export default function DocumentLibrary() {
               ))}
           </div>
         </TabsContent>
-
-        <TabsContent value="favorites">
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">
-              Favorite documents will appear here.
-            </p>
-          </div>
-        </TabsContent>
       </Tabs>
 
       <DocumentUploadDialog
@@ -265,6 +178,7 @@ export default function DocumentLibrary() {
           isOpen={isViewDialogOpen}
           onClose={() => setIsViewDialogOpen(false)}
           document={selectedDocument}
+          onDownload={handleDownloadDocument}
         />
       )}
     </div>

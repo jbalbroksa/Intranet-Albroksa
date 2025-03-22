@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -14,6 +13,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Save, X } from "lucide-react";
+
+// Import React Quill WYSIWYG editor
+import ReactQuill from "react-quill";
+import "react-quill/dist/quill.snow.css";
 
 interface ProductEditorProps {
   initialProduct?: {
@@ -42,6 +45,32 @@ interface ProductEditorProps {
   }) => void;
   onCancel?: () => void;
 }
+
+// Quill editor modules and formats
+const modules = {
+  toolbar: [
+    [{ header: [1, 2, 3, 4, 5, 6, false] }],
+    ["bold", "italic", "underline", "strike"],
+    [{ list: "ordered" }, { list: "bullet" }],
+    [{ color: [] }, { background: [] }],
+    ["link", "image"],
+    ["clean"],
+  ],
+};
+
+const formats = [
+  "header",
+  "bold",
+  "italic",
+  "underline",
+  "strike",
+  "list",
+  "bullet",
+  "link",
+  "image",
+  "color",
+  "background",
+];
 
 export default function ProductEditor({
   initialProduct = {
@@ -153,45 +182,48 @@ export default function ProductEditor({
 
             <TabsContent value="edit" className="space-y-2">
               <Label htmlFor="content">Descripción General</Label>
-              <Textarea
-                id="content"
+              <ReactQuill
+                theme="snow"
                 value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="Descripción general del producto..."
+                onChange={setContent}
+                modules={modules}
+                formats={formats}
                 className="min-h-[200px]"
-                required
               />
             </TabsContent>
 
             <TabsContent value="procesos" className="space-y-2">
               <Label htmlFor="procesos">Procesos</Label>
-              <Textarea
-                id="procesos"
+              <ReactQuill
+                theme="snow"
                 value={procesos}
-                onChange={(e) => setProcesos(e.target.value)}
-                placeholder="Procesos relacionados con el producto..."
+                onChange={setProcesos}
+                modules={modules}
+                formats={formats}
                 className="min-h-[200px]"
               />
             </TabsContent>
 
             <TabsContent value="debilidades" className="space-y-2">
               <Label htmlFor="debilidades">Debilidades</Label>
-              <Textarea
-                id="debilidades"
+              <ReactQuill
+                theme="snow"
                 value={debilidades}
-                onChange={(e) => setDebilidades(e.target.value)}
-                placeholder="Debilidades del producto..."
+                onChange={setDebilidades}
+                modules={modules}
+                formats={formats}
                 className="min-h-[200px]"
               />
             </TabsContent>
 
             <TabsContent value="observaciones" className="space-y-2">
               <Label htmlFor="observaciones">Observaciones</Label>
-              <Textarea
-                id="observaciones"
+              <ReactQuill
+                theme="snow"
                 value={observaciones}
-                onChange={(e) => setObservaciones(e.target.value)}
-                placeholder="Observaciones adicionales..."
+                onChange={setObservaciones}
+                modules={modules}
+                formats={formats}
                 className="min-h-[200px]"
               />
             </TabsContent>
@@ -207,30 +239,30 @@ export default function ProductEditor({
                   {content ? (
                     <div className="prose max-w-none">
                       <h1>{title || "Producto sin título"}</h1>
-                      <div className="whitespace-pre-wrap">{content}</div>
+                      <div dangerouslySetInnerHTML={{ __html: content }} />
 
                       {procesos && (
                         <>
                           <h2>Procesos</h2>
-                          <div className="whitespace-pre-wrap">{procesos}</div>
+                          <div dangerouslySetInnerHTML={{ __html: procesos }} />
                         </>
                       )}
 
                       {debilidades && (
                         <>
                           <h2>Debilidades</h2>
-                          <div className="whitespace-pre-wrap">
-                            {debilidades}
-                          </div>
+                          <div
+                            dangerouslySetInnerHTML={{ __html: debilidades }}
+                          />
                         </>
                       )}
 
                       {observaciones && (
                         <>
                           <h2>Observaciones</h2>
-                          <div className="whitespace-pre-wrap">
-                            {observaciones}
-                          </div>
+                          <div
+                            dangerouslySetInnerHTML={{ __html: observaciones }}
+                          />
                         </>
                       )}
                     </div>

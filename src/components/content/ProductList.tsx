@@ -1,7 +1,16 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -9,7 +18,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Filter, PlusCircle, Search } from "lucide-react";
+import {
+  Filter,
+  PlusCircle,
+  Search,
+  Edit,
+  Trash,
+  ChevronRight,
+  ChevronDown,
+  BookOpen,
+} from "lucide-react";
 import ProductCard from "./ProductCard";
 import ProductEditor from "./ProductEditor";
 import { supabase } from "@/lib/supabase";
@@ -43,6 +61,7 @@ const MAIN_CATEGORIES = [
 ];
 
 export default function ProductList() {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState(
@@ -58,6 +77,12 @@ export default function ProductList() {
     null,
   );
   const [isLoading, setIsLoading] = useState(true);
+
+  // State for expanded categories and subcategories
+  const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
+  const [expandedSubcategories, setExpandedSubcategories] = useState<string[]>(
+    [],
+  );
 
   // Fetch products and subcategories
   useEffect(() => {
@@ -186,6 +211,29 @@ export default function ProductList() {
         variant: "destructive",
       });
     }
+  };
+
+  // Function to view a product
+  const handleViewProduct = (id: string) => {
+    navigate(`/content/${id}`);
+  };
+
+  // Toggle category expansion
+  const toggleCategory = (category: string) => {
+    setExpandedCategories((prev) =>
+      prev.includes(category)
+        ? prev.filter((c) => c !== category)
+        : [...prev, category],
+    );
+  };
+
+  // Toggle subcategory expansion
+  const toggleSubcategory = (subcategory: string) => {
+    setExpandedSubcategories((prev) =>
+      prev.includes(subcategory)
+        ? prev.filter((s) => s !== subcategory)
+        : [...prev, subcategory],
+    );
   };
 
   const handleSaveProduct = async (productData: {
@@ -343,7 +391,7 @@ export default function ProductList() {
   return (
     <div className="h-full flex flex-col">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-        <h1 className="text-2xl font-bold">Gestión de Productos</h1>
+        <h1 className="text-2xl font-bold">Base de Conocimientos</h1>
         <Button onClick={handleCreateProduct}>
           <PlusCircle className="mr-2 h-4 w-4" /> Crear Producto
         </Button>
@@ -427,46 +475,707 @@ export default function ProductList() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-4">
-              {filteredProducts.map((product) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  onEdit={() => handleEditProduct(product.id)}
-                  onDelete={() => handleDeleteProduct(product.id)}
-                />
-              ))}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {selectedCategory !== "Todas las Categorías" ? (
+                // Show products for selected category
+                <Card className="col-span-full">
+                  <CardHeader className="pb-3">
+                    <CardTitle>{selectedCategory}</CardTitle>
+                    <CardDescription>
+                      {selectedSubcategory !== "Todas las Subcategorías"
+                        ? `Subcategoría: ${selectedSubcategory.split("/")[1] || selectedSubcategory}`
+                        : "Todas las subcategorías"}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {selectedSubcategory !== "Todas las Subcategorías" ? (
+                      // Show products for selected subcategory
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {filteredProducts.map((product) => (
+                          <ProductCard
+                            key={product.id}
+                            product={product}
+                            onEdit={() => handleEditProduct(product.id)}
+                            onDelete={() => handleDeleteProduct(product.id)}
+                            onView={() => handleViewProduct(product.id)}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      // Group by subcategory
+                      <div className="space-y-6">
+                        {Array.from(
+                          new Set(filteredProducts.map((p) => p.subcategory)),
+                        ).map((subcategory) => {
+                          const subcategoryProducts = filteredProducts.filter(
+                            (p) => p.subcategory === subcategory,
+                          );
+                          if (subcategoryProducts.length === 0) return null;
+
+                          const isExpanded = expandedSubcategories.includes(
+                            subcategory || "none",
+                          );
+
+                          return (
+                            <div key={subcategory || "none"}>
+                              <Button
+                                variant="ghost"
+                                className="w-full justify-between mb-2 font-medium text-left"
+                                onClick={() =>
+                                  toggleSubcategory(subcategory || "none")
+                                }
+                              >
+                                <span>
+                                  {subcategory
+                                    ? subcategory.split("/")[1] || subcategory
+                                    : "Sin subcategoría"}
+                                </span>
+                                {isExpanded ? (
+                                  <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4" />
+                                )}
+                              </Button>
+
+                              {isExpanded && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-2">
+                                  {subcategoryProducts.map((product) => (
+                                    <ProductCard
+                                      key={product.id}
+                                      product={product}
+                                      onEdit={() =>
+                                        handleEditProduct(product.id)
+                                      }
+                                      onDelete={() =>
+                                        handleDeleteProduct(product.id)
+                                      }
+                                      onView={() =>
+                                        handleViewProduct(product.id)
+                                      }
+                                    />
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : (
+                // Show all categories as cards
+                MAIN_CATEGORIES.map((category) => {
+                  const categoryProducts = filteredProducts.filter(
+                    (p) => p.category === category,
+                  );
+                  if (categoryProducts.length === 0) return null;
+
+                  const isExpanded = expandedCategories.includes(category);
+
+                  return (
+                    <Card key={category} className="col-span-1">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center justify-between">
+                          <span>{category}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => toggleCategory(category)}
+                            className="ml-2"
+                          >
+                            {isExpanded ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </CardTitle>
+                        <CardDescription>
+                          {categoryProducts.length} producto
+                          {categoryProducts.length !== 1 ? "s" : ""}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {!isExpanded ? (
+                          <div className="flex justify-center items-center py-6">
+                            <BookOpen className="h-12 w-12 text-muted-foreground opacity-50" />
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            {Array.from(
+                              new Set(
+                                categoryProducts.map((p) => p.subcategory),
+                              ),
+                            ).map((subcategory) => {
+                              const subcategoryProducts =
+                                categoryProducts.filter(
+                                  (p) => p.subcategory === subcategory,
+                                );
+                              if (subcategoryProducts.length === 0) return null;
+
+                              const isSubExpanded =
+                                expandedSubcategories.includes(
+                                  `${category}-${subcategory || "none"}`,
+                                );
+
+                              return (
+                                <div key={subcategory || "none"}>
+                                  <Button
+                                    variant="ghost"
+                                    className="w-full justify-between mb-2 font-medium text-left"
+                                    onClick={() =>
+                                      toggleSubcategory(
+                                        `${category}-${subcategory || "none"}`,
+                                      )
+                                    }
+                                  >
+                                    <span>
+                                      {subcategory
+                                        ? subcategory.split("/")[1] ||
+                                          subcategory
+                                        : "Sin subcategoría"}
+                                    </span>
+                                    {isSubExpanded ? (
+                                      <ChevronDown className="h-4 w-4" />
+                                    ) : (
+                                      <ChevronRight className="h-4 w-4" />
+                                    )}
+                                  </Button>
+
+                                  {isSubExpanded && (
+                                    <div className="space-y-2">
+                                      {subcategoryProducts.map((product) => (
+                                        <div
+                                          key={product.id}
+                                          className="p-2 hover:bg-muted rounded-md cursor-pointer flex justify-between items-center"
+                                          onClick={() =>
+                                            handleViewProduct(product.id)
+                                          }
+                                        >
+                                          <span className="line-clamp-1">
+                                            {product.title}
+                                          </span>
+                                          <div className="flex gap-2">
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleEditProduct(product.id);
+                                              }}
+                                            >
+                                              <Edit className="h-4 w-4" />
+                                            </Button>
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDeleteProduct(product.id);
+                                              }}
+                                            >
+                                              <Trash className="h-4 w-4 text-red-500" />
+                                            </Button>
+                                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </CardContent>
+                      <CardFooter className="pt-2 border-t">
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-center"
+                          onClick={() => toggleCategory(category)}
+                        >
+                          {isExpanded ? "Colapsar" : "Expandir"}
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  );
+                })
+              )}
             </div>
           )}
         </TabsContent>
 
         <TabsContent value="published">
-          <div className="grid grid-cols-1 gap-4">
-            {filteredProducts
-              .filter((product) => product.status === "published")
-              .map((product) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  onEdit={() => handleEditProduct(product.id)}
-                  onDelete={() => handleDeleteProduct(product.id)}
-                />
-              ))}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {selectedCategory !== "Todas las Categorías" ? (
+              // Show published products for selected category
+              <Card className="col-span-full">
+                <CardHeader className="pb-3">
+                  <CardTitle>{selectedCategory} - Publicados</CardTitle>
+                  <CardDescription>
+                    {selectedSubcategory !== "Todas las Subcategorías"
+                      ? `Subcategoría: ${selectedSubcategory.split("/")[1] || selectedSubcategory}`
+                      : "Todas las subcategorías"}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {selectedSubcategory !== "Todas las Subcategorías" ? (
+                    // Show published products for selected subcategory
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {filteredProducts
+                        .filter((product) => product.status === "published")
+                        .map((product) => (
+                          <ProductCard
+                            key={product.id}
+                            product={product}
+                            onEdit={() => handleEditProduct(product.id)}
+                            onDelete={() => handleDeleteProduct(product.id)}
+                            onView={() => handleViewProduct(product.id)}
+                          />
+                        ))}
+                    </div>
+                  ) : (
+                    // Group published products by subcategory
+                    <div className="space-y-6">
+                      {Array.from(
+                        new Set(
+                          filteredProducts
+                            .filter((p) => p.status === "published")
+                            .map((p) => p.subcategory),
+                        ),
+                      ).map((subcategory) => {
+                        const subcategoryProducts = filteredProducts.filter(
+                          (p) =>
+                            p.status === "published" &&
+                            p.subcategory === subcategory,
+                        );
+                        if (subcategoryProducts.length === 0) return null;
+
+                        const isExpanded = expandedSubcategories.includes(
+                          `published-${subcategory || "none"}`,
+                        );
+
+                        return (
+                          <div key={subcategory || "none"}>
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-between mb-2 font-medium text-left"
+                              onClick={() =>
+                                toggleSubcategory(
+                                  `published-${subcategory || "none"}`,
+                                )
+                              }
+                            >
+                              <span>
+                                {subcategory
+                                  ? subcategory.split("/")[1] || subcategory
+                                  : "Sin subcategoría"}
+                              </span>
+                              {isExpanded ? (
+                                <ChevronDown className="h-4 w-4" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4" />
+                              )}
+                            </Button>
+
+                            {isExpanded && (
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-2">
+                                {subcategoryProducts.map((product) => (
+                                  <ProductCard
+                                    key={product.id}
+                                    product={product}
+                                    onEdit={() => handleEditProduct(product.id)}
+                                    onDelete={() =>
+                                      handleDeleteProduct(product.id)
+                                    }
+                                    onView={() => handleViewProduct(product.id)}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
+              // Show all published products by category
+              MAIN_CATEGORIES.map((category) => {
+                const categoryProducts = filteredProducts.filter(
+                  (p) => p.status === "published" && p.category === category,
+                );
+                if (categoryProducts.length === 0) return null;
+
+                const isExpanded = expandedCategories.includes(
+                  `published-${category}`,
+                );
+
+                return (
+                  <Card key={category} className="col-span-1">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center justify-between">
+                        <span>{category}</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            toggleCategory(`published-${category}`)
+                          }
+                          className="ml-2"
+                        >
+                          {isExpanded ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </CardTitle>
+                      <CardDescription>
+                        {categoryProducts.length} producto
+                        {categoryProducts.length !== 1 ? "s" : ""} publicado
+                        {categoryProducts.length !== 1 ? "s" : ""}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {!isExpanded ? (
+                        <div className="flex justify-center items-center py-6">
+                          <BookOpen className="h-12 w-12 text-muted-foreground opacity-50" />
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {Array.from(
+                            new Set(categoryProducts.map((p) => p.subcategory)),
+                          ).map((subcategory) => {
+                            const subcategoryProducts = categoryProducts.filter(
+                              (p) => p.subcategory === subcategory,
+                            );
+                            if (subcategoryProducts.length === 0) return null;
+
+                            const isSubExpanded =
+                              expandedSubcategories.includes(
+                                `published-${category}-${subcategory || "none"}`,
+                              );
+
+                            return (
+                              <div key={subcategory || "none"}>
+                                <Button
+                                  variant="ghost"
+                                  className="w-full justify-between mb-2 font-medium text-left"
+                                  onClick={() =>
+                                    toggleSubcategory(
+                                      `published-${category}-${subcategory || "none"}`,
+                                    )
+                                  }
+                                >
+                                  <span>
+                                    {subcategory
+                                      ? subcategory.split("/")[1] || subcategory
+                                      : "Sin subcategoría"}
+                                  </span>
+                                  {isSubExpanded ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4" />
+                                  )}
+                                </Button>
+
+                                {isSubExpanded && (
+                                  <div className="space-y-2">
+                                    {subcategoryProducts.map((product) => (
+                                      <div
+                                        key={product.id}
+                                        className="p-2 hover:bg-muted rounded-md cursor-pointer flex justify-between items-center"
+                                        onClick={() =>
+                                          handleViewProduct(product.id)
+                                        }
+                                      >
+                                        <span className="line-clamp-1">
+                                          {product.title}
+                                        </span>
+                                        <div className="flex gap-2">
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleEditProduct(product.id);
+                                            }}
+                                          >
+                                            <Edit className="h-4 w-4" />
+                                          </Button>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleDeleteProduct(product.id);
+                                            }}
+                                          >
+                                            <Trash className="h-4 w-4 text-red-500" />
+                                          </Button>
+                                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </CardContent>
+                    <CardFooter className="pt-2 border-t">
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-center"
+                        onClick={() => toggleCategory(`published-${category}`)}
+                      >
+                        {isExpanded ? "Colapsar" : "Expandir"}
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                );
+              })
+            )}
           </div>
         </TabsContent>
 
         <TabsContent value="drafts">
-          <div className="grid grid-cols-1 gap-4">
-            {filteredProducts
-              .filter((product) => product.status === "draft")
-              .map((product) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  onEdit={() => handleEditProduct(product.id)}
-                  onDelete={() => handleDeleteProduct(product.id)}
-                />
-              ))}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {selectedCategory !== "Todas las Categorías" ? (
+              // Show draft products for selected category
+              <Card className="col-span-full">
+                <CardHeader className="pb-3">
+                  <CardTitle>{selectedCategory} - Borradores</CardTitle>
+                  <CardDescription>
+                    {selectedSubcategory !== "Todas las Subcategorías"
+                      ? `Subcategoría: ${selectedSubcategory.split("/")[1] || selectedSubcategory}`
+                      : "Todas las subcategorías"}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {selectedSubcategory !== "Todas las Subcategorías" ? (
+                    // Show draft products for selected subcategory
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {filteredProducts
+                        .filter((product) => product.status === "draft")
+                        .map((product) => (
+                          <ProductCard
+                            key={product.id}
+                            product={product}
+                            onEdit={() => handleEditProduct(product.id)}
+                            onDelete={() => handleDeleteProduct(product.id)}
+                            onView={() => handleViewProduct(product.id)}
+                          />
+                        ))}
+                    </div>
+                  ) : (
+                    // Group draft products by subcategory
+                    <div className="space-y-6">
+                      {Array.from(
+                        new Set(
+                          filteredProducts
+                            .filter((p) => p.status === "draft")
+                            .map((p) => p.subcategory),
+                        ),
+                      ).map((subcategory) => {
+                        const subcategoryProducts = filteredProducts.filter(
+                          (p) =>
+                            p.status === "draft" &&
+                            p.subcategory === subcategory,
+                        );
+                        if (subcategoryProducts.length === 0) return null;
+
+                        const isExpanded = expandedSubcategories.includes(
+                          `draft-${subcategory || "none"}`,
+                        );
+
+                        return (
+                          <div key={subcategory || "none"}>
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-between mb-2 font-medium text-left"
+                              onClick={() =>
+                                toggleSubcategory(
+                                  `draft-${subcategory || "none"}`,
+                                )
+                              }
+                            >
+                              <span>
+                                {subcategory
+                                  ? subcategory.split("/")[1] || subcategory
+                                  : "Sin subcategoría"}
+                              </span>
+                              {isExpanded ? (
+                                <ChevronDown className="h-4 w-4" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4" />
+                              )}
+                            </Button>
+
+                            {isExpanded && (
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-2">
+                                {subcategoryProducts.map((product) => (
+                                  <ProductCard
+                                    key={product.id}
+                                    product={product}
+                                    onEdit={() => handleEditProduct(product.id)}
+                                    onDelete={() =>
+                                      handleDeleteProduct(product.id)
+                                    }
+                                    onView={() => handleViewProduct(product.id)}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
+              // Show all draft products by category
+              MAIN_CATEGORIES.map((category) => {
+                const categoryProducts = filteredProducts.filter(
+                  (p) => p.status === "draft" && p.category === category,
+                );
+                if (categoryProducts.length === 0) return null;
+
+                const isExpanded = expandedCategories.includes(
+                  `draft-${category}`,
+                );
+
+                return (
+                  <Card key={category} className="col-span-1">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center justify-between">
+                        <span>{category}</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggleCategory(`draft-${category}`)}
+                          className="ml-2"
+                        >
+                          {isExpanded ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </CardTitle>
+                      <CardDescription>
+                        {categoryProducts.length} borrador
+                        {categoryProducts.length !== 1 ? "es" : ""}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {!isExpanded ? (
+                        <div className="flex justify-center items-center py-6">
+                          <BookOpen className="h-12 w-12 text-muted-foreground opacity-50" />
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {Array.from(
+                            new Set(categoryProducts.map((p) => p.subcategory)),
+                          ).map((subcategory) => {
+                            const subcategoryProducts = categoryProducts.filter(
+                              (p) => p.subcategory === subcategory,
+                            );
+                            if (subcategoryProducts.length === 0) return null;
+
+                            const isSubExpanded =
+                              expandedSubcategories.includes(
+                                `draft-${category}-${subcategory || "none"}`,
+                              );
+
+                            return (
+                              <div key={subcategory || "none"}>
+                                <Button
+                                  variant="ghost"
+                                  className="w-full justify-between mb-2 font-medium text-left"
+                                  onClick={() =>
+                                    toggleSubcategory(
+                                      `draft-${category}-${subcategory || "none"}`,
+                                    )
+                                  }
+                                >
+                                  <span>
+                                    {subcategory
+                                      ? subcategory.split("/")[1] || subcategory
+                                      : "Sin subcategoría"}
+                                  </span>
+                                  {isSubExpanded ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4" />
+                                  )}
+                                </Button>
+
+                                {isSubExpanded && (
+                                  <div className="space-y-2">
+                                    {subcategoryProducts.map((product) => (
+                                      <div
+                                        key={product.id}
+                                        className="p-2 hover:bg-muted rounded-md cursor-pointer flex justify-between items-center"
+                                        onClick={() =>
+                                          handleViewProduct(product.id)
+                                        }
+                                      >
+                                        <span className="line-clamp-1">
+                                          {product.title}
+                                        </span>
+                                        <div className="flex gap-2">
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleEditProduct(product.id);
+                                            }}
+                                          >
+                                            <Edit className="h-4 w-4" />
+                                          </Button>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleDeleteProduct(product.id);
+                                            }}
+                                          >
+                                            <Trash className="h-4 w-4 text-red-500" />
+                                          </Button>
+                                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </CardContent>
+                    <CardFooter className="pt-2 border-t">
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-center"
+                        onClick={() => toggleCategory(`draft-${category}`)}
+                      >
+                        {isExpanded ? "Colapsar" : "Expandir"}
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                );
+              })
+            )}
           </div>
         </TabsContent>
       </Tabs>

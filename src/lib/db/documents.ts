@@ -14,7 +14,9 @@ export async function getDocuments() {
       `
       *,
       users:uploaded_by(id, full_name, avatar_url),
-      document_tags(id, tag)
+      document_tags(id, tag),
+      companies:company_id(id, name),
+      content:content_id(id, title)
     `,
     )
     .order("uploaded_at", { ascending: false });
@@ -24,7 +26,34 @@ export async function getDocuments() {
     return [];
   }
 
-  return data;
+  return data.map((doc) => ({
+    id: doc.id,
+    title: doc.title,
+    description: doc.description,
+    fileType: doc.file_type,
+    category: doc.category,
+    uploadedBy: {
+      name: doc.users?.full_name || "Usuario",
+      avatar:
+        doc.users?.avatar_url ||
+        `https://api.dicebear.com/7.x/avataaars/svg?seed=${doc.uploaded_by}`,
+    },
+    uploadedAt: new Date(doc.uploaded_at),
+    fileSize: doc.file_size,
+    version: doc.version,
+    tags: doc.document_tags?.map((tag) => tag.tag) || [],
+    fileUrl: doc.file_path
+      ? supabase.storage.from("documents").getPublicUrl(doc.file_path).data
+          .publicUrl
+      : undefined,
+    // Add linked entity information
+    companyId: doc.company_id || undefined,
+    companyName: doc.companies?.name || undefined,
+    productId: doc.content_id || undefined,
+    productTitle: doc.content?.title || undefined,
+    productCategory: doc.category || undefined,
+    productSubcategory: doc.subcategory || undefined,
+  }));
 }
 
 /**
@@ -37,7 +66,9 @@ export async function getDocumentById(id: string) {
       `
       *,
       users:uploaded_by(id, full_name, avatar_url),
-      document_tags(id, tag)
+      document_tags(id, tag),
+      companies:company_id(id, name),
+      content:content_id(id, title)
     `,
     )
     .eq("id", id)
@@ -48,7 +79,34 @@ export async function getDocumentById(id: string) {
     return null;
   }
 
-  return data;
+  return {
+    id: data.id,
+    title: data.title,
+    description: data.description,
+    fileType: data.file_type,
+    category: data.category,
+    uploadedBy: {
+      name: data.users?.full_name || "Usuario",
+      avatar:
+        data.users?.avatar_url ||
+        `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.uploaded_by}`,
+    },
+    uploadedAt: new Date(data.uploaded_at),
+    fileSize: data.file_size,
+    version: data.version,
+    tags: data.document_tags?.map((tag) => tag.tag) || [],
+    fileUrl: data.file_path
+      ? supabase.storage.from("documents").getPublicUrl(data.file_path).data
+          .publicUrl
+      : undefined,
+    // Add linked entity information
+    companyId: data.company_id || undefined,
+    companyName: data.companies?.name || undefined,
+    productId: data.content_id || undefined,
+    productTitle: data.content?.title || undefined,
+    productCategory: data.category || undefined,
+    productSubcategory: data.subcategory || undefined,
+  };
 }
 
 /**
@@ -60,6 +118,10 @@ export async function uploadDocument(document: {
   description?: string;
   category: string;
   tags?: string[];
+  companyId?: string;
+  contentId?: string;
+  productCategory?: string;
+  productSubcategory?: string;
 }) {
   try {
     // Get current user
@@ -91,6 +153,11 @@ export async function uploadDocument(document: {
         version: "1.0",
         file_path: filePath,
         uploaded_by: user.id,
+        // Add linking fields
+        company_id: document.companyId || null,
+        content_id: document.contentId || null,
+        category: document.productCategory || null,
+        subcategory: document.productSubcategory || null,
       })
       .select()
       .single();

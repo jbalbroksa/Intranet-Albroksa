@@ -1,192 +1,282 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Calendar } from "@/components/ui/calendar";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
-import { PlusCircle, Calendar as CalendarIcon, Clock } from "lucide-react";
+import { es } from "date-fns/locale";
+import { format, isSameDay } from "date-fns";
+import { Button } from "@/components/ui/button";
+import {
+  PlusCircle,
+  Edit,
+  Trash,
+  Calendar as CalendarIcon,
+} from "lucide-react";
+import EventDialog from "./EventDialog";
+import { supabase } from "@/lib/supabase";
+import { useToast } from "@/components/ui/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
-interface Event {
+interface CalendarEvent {
   id: string;
   title: string;
-  date: Date;
-  startTime: string;
-  endTime: string;
+  description: string;
+  event_date: string;
+  start_time: string;
+  end_time: string;
   location: string;
   category: string;
-  description?: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
 }
 
-const MOCK_EVENTS: Event[] = [
-  {
-    id: "1",
-    title: "Quarterly Sales Meeting",
-    date: new Date(2024, 6, 15),
-    startTime: "10:00 AM",
-    endTime: "11:30 AM",
-    location: "Main Conference Room",
-    category: "Meeting",
-    description: "Review Q2 sales performance and discuss Q3 targets",
-  },
-  {
-    id: "2",
-    title: "New Product Training",
-    date: new Date(2024, 6, 18),
-    startTime: "2:00 PM",
-    endTime: "4:00 PM",
-    location: "Training Room B",
-    category: "Training",
-    description: "Introduction to the new cyber insurance product line",
-  },
-  {
-    id: "3",
-    title: "Team Building Event",
-    date: new Date(2024, 6, 22),
-    startTime: "1:00 PM",
-    endTime: "5:00 PM",
-    location: "City Park",
-    category: "Social",
-    description: "Annual team building activity with outdoor games",
-  },
-  {
-    id: "4",
-    title: "Compliance Webinar",
-    date: new Date(2024, 6, 25),
-    startTime: "11:00 AM",
-    endTime: "12:00 PM",
-    location: "Online",
-    category: "Webinar",
-    description: "Updates on regulatory changes affecting insurance sales",
-  },
-  {
-    id: "5",
-    title: "Marketing Strategy Session",
-    date: new Date(2024, 6, 28),
-    startTime: "9:00 AM",
-    endTime: "12:00 PM",
-    location: "Conference Room A",
-    category: "Meeting",
-    description: "Planning for Q4 marketing campaigns",
-  },
-];
-
-const getCategoryColor = (category: string) => {
-  switch (category) {
-    case "Meeting":
-      return "bg-blue-100 text-blue-800";
-    case "Training":
-      return "bg-green-100 text-green-800";
-    case "Social":
-      return "bg-purple-100 text-purple-800";
-    case "Webinar":
-      return "bg-amber-100 text-amber-800";
-    default:
-      return "bg-gray-100 text-gray-800";
-  }
-};
-
 export default function CalendarView() {
+  const { toast } = useToast();
   const [date, setDate] = useState<Date | undefined>(new Date());
-  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [filteredEvents, setFilteredEvents] = useState<CalendarEvent[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<
+    CalendarEvent | undefined
+  >();
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [eventToDelete, setEventToDelete] = useState<string | null>(null);
 
-  // Get events for the selected date
-  const eventsForSelectedDate = date
-    ? MOCK_EVENTS.filter(
-        (event) =>
-          event.date.getDate() === date.getDate() &&
-          event.date.getMonth() === date.getMonth() &&
-          event.date.getFullYear() === date.getFullYear(),
-      )
-    : [];
+  useEffect(() => {
+    fetchEvents();
+  }, []);
 
-  // Get dates with events for highlighting in the calendar
-  const datesWithEvents = MOCK_EVENTS.map((event) => event.date);
+  useEffect(() => {
+    if (date && events.length > 0) {
+      const eventsForDate = events.filter((event) =>
+        isSameDay(new Date(event.event_date), date),
+      );
+      setFilteredEvents(eventsForDate);
+    } else {
+      setFilteredEvents([]);
+    }
+  }, [date, events]);
+
+  const fetchEvents = async () => {
+    try {
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from("calendar_events")
+        .select("*")
+        .order("event_date", { ascending: true });
+
+      if (error) throw error;
+
+      setEvents(data || []);
+    } catch (error) {
+      console.error("Error fetching events:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los eventos",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCreateEvent = () => {
+    setSelectedEvent(undefined);
+    setIsDialogOpen(true);
+  };
+
+  const handleEditEvent = (event: CalendarEvent) => {
+    setSelectedEvent(event);
+    setIsDialogOpen(true);
+  };
+
+  const handleDeleteEvent = (eventId: string) => {
+    setEventToDelete(eventId);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteEvent = async () => {
+    if (!eventToDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from("calendar_events")
+        .delete()
+        .eq("id", eventToDelete);
+
+      if (error) throw error;
+
+      setEvents(events.filter((event) => event.id !== eventToDelete));
+      toast({
+        title: "Evento eliminado",
+        description: "El evento ha sido eliminado correctamente",
+      });
+    } catch (error) {
+      console.error("Error deleting event:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el evento",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleteDialogOpen(false);
+      setEventToDelete(null);
+    }
+  };
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Calendar</h1>
-        <Button>
-          <PlusCircle className="mr-2 h-4 w-4" /> Add Event
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Calendario</h1>
+        <Button onClick={handleCreateEvent}>
+          <PlusCircle className="mr-2 h-4 w-4" /> Añadir Evento
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 flex-1">
-        <Card className="md:col-span-1">
-          <CardContent className="p-4">
-            <Calendar
-              mode="single"
-              selected={date}
-              onSelect={setDate}
-              className="rounded-md border"
-              modifiers={{
-                event: datesWithEvents,
-              }}
-              modifiersStyles={{
-                event: {
-                  fontWeight: "bold",
-                  backgroundColor: "var(--primary-50)",
-                  color: "var(--primary-900)",
-                },
-              }}
-            />
-          </CardContent>
-        </Card>
-
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle>
-              {date ? format(date, "EEEE, MMMM d, yyyy") : "Select a date"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {eventsForSelectedDate.length === 0 ? (
-              <div className="text-center py-12">
-                <CalendarIcon className="mx-auto h-12 w-12 text-muted-foreground opacity-50" />
-                <p className="mt-4 text-muted-foreground">
-                  No events scheduled for this day.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {eventsForSelectedDate.map((event) => (
-                  <div
-                    key={event.id}
-                    className="p-4 border rounded-md hover:shadow-sm transition-shadow cursor-pointer"
-                    onClick={() => setSelectedEvent(event)}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-medium">{event.title}</h3>
-                        <div className="flex items-center text-sm text-muted-foreground mt-1">
-                          <Clock className="h-4 w-4 mr-1" />
-                          <span>
-                            {event.startTime} - {event.endTime}
-                          </span>
-                        </div>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {event.location}
-                        </p>
-                      </div>
-                      <Badge
-                        className={getCategoryColor(event.category)}
-                        variant="outline"
-                      >
-                        {event.category}
-                      </Badge>
+      <Card>
+        <CardHeader>
+          <CardTitle>Calendario de Eventos</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col md:flex-row gap-6">
+            <div className="md:w-[350px]">
+              <Calendar
+                mode="single"
+                selected={date}
+                onSelect={setDate}
+                locale={es}
+                className="rounded-md border"
+              />
+            </div>
+            <div className="flex-1">
+              {date ? (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">
+                    {date.toLocaleDateString("es-ES", {
+                      weekday: "long",
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })}
+                  </h3>
+                  {isLoading ? (
+                    <div className="text-center py-12">
+                      <p className="text-muted-foreground">
+                        Cargando eventos...
+                      </p>
                     </div>
-                    {selectedEvent?.id === event.id && event.description && (
-                      <div className="mt-3 pt-3 border-t">
-                        <p className="text-sm">{event.description}</p>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                  ) : filteredEvents.length > 0 ? (
+                    <div className="space-y-3">
+                      {filteredEvents.map((event) => (
+                        <Card key={event.id} className="overflow-hidden">
+                          <div className="p-4 border-l-4 border-primary">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <h4 className="font-medium">{event.title}</h4>
+                                <div className="flex items-center text-sm text-muted-foreground mt-1">
+                                  <CalendarIcon className="h-3 w-3 mr-1" />
+                                  <span>
+                                    {event.start_time} - {event.end_time}
+                                  </span>
+                                  {event.location && (
+                                    <span className="ml-2">
+                                      | {event.location}
+                                    </span>
+                                  )}
+                                </div>
+                                {event.description && (
+                                  <p className="text-sm mt-2">
+                                    {event.description}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="flex space-x-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleEditEvent(event)}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleDeleteEvent(event.id)}
+                                >
+                                  <Trash className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <p className="text-muted-foreground">
+                        No hay eventos programados para este día.
+                      </p>
+                      <Button
+                        variant="outline"
+                        className="mt-4"
+                        onClick={handleCreateEvent}
+                      >
+                        <PlusCircle className="mr-2 h-4 w-4" /> Añadir Evento
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground">
+                    Seleccione una fecha para ver los eventos.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <EventDialog
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        event={selectedEvent}
+        onEventSaved={fetchEvents}
+      />
+
+      <AlertDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Está seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. El evento será eliminado
+              permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteEvent}
+              className="bg-destructive text-destructive-foreground"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

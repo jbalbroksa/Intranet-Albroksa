@@ -20,7 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { UserItem } from "./UserManagement";
+import type { UserItem } from "./UserManagement";
 
 interface UserCardProps {
   user: UserItem;
@@ -28,7 +28,7 @@ interface UserCardProps {
   onDelete: () => void;
 }
 
-export default function UserCard({ user, onEdit, onDelete }: UserCardProps) {
+function UserCard({ user, onEdit, onDelete }: UserCardProps) {
   return (
     <Card className="overflow-hidden hover:shadow-sm transition-shadow">
       <CardHeader className="pb-2 relative">
@@ -110,3 +110,5 @@ export default function UserCard({ user, onEdit, onDelete }: UserCardProps) {
     </Card>
   );
 }
+
+export default UserCard;

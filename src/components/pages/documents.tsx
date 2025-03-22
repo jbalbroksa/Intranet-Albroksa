@@ -7,9 +7,8 @@ export default function DocumentsPage() {
     <DashboardLayout activeItem="Documents">
       <Tabs defaultValue="documents" className="w-full">
         <TabsList className="mb-4">
-          <TabsTrigger value="documents">Documents</TabsTrigger>
-          <TabsTrigger value="templates">Templates</TabsTrigger>
-          <TabsTrigger value="shared">Shared with Me</TabsTrigger>
+          <TabsTrigger value="documents">Documentos</TabsTrigger>
+          <TabsTrigger value="templates">Plantillas</TabsTrigger>
         </TabsList>
         <TabsContent value="documents">
           <DocumentLibrary />
@@ -17,14 +16,7 @@ export default function DocumentsPage() {
         <TabsContent value="templates">
           <div className="text-center py-12">
             <p className="text-muted-foreground">
-              Templates will be available soon.
-            </p>
-          </div>
-        </TabsContent>
-        <TabsContent value="shared">
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">
-              Shared documents will appear here.
+              Las plantillas estarán disponibles próximamente.
             </p>
           </div>
         </TabsContent>

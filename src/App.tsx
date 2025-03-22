@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import React, { Suspense } from "react";
 import { Navigate, Route, Routes, useRoutes } from "react-router-dom";
 import routes from "tempo-routes";
 import LoginForm from "./components/auth/LoginForm";
@@ -13,6 +13,7 @@ import UserManagement from "./components/pages/user-management";
 import Settings from "./components/pages/settings";
 import Calendar from "./components/pages/calendar";
 import Users from "./components/pages/users";
+import News from "./components/pages/news";
 import { AuthProvider, useAuth } from "../supabase/auth";
 import { Toaster } from "./components/ui/toaster";
 
@@ -32,19 +33,25 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 
 function AppRoutes() {
   // For Tempo routes
+  // Use { useMatch: () => false } to prevent route matching errors with hash URLs
   const tempoRoutes =
-    import.meta.env.VITE_TEMPO === "true" ? useRoutes(routes) : null;
+    import.meta.env.VITE_TEMPO === "true"
+      ? useRoutes(routes, {
+          useMatch: (path) => (path.includes("#") ? false : undefined),
+        })
+      : null;
 
   return (
     <>
-      {tempoRoutes}
+      {/* For the tempo routes */}
+      {import.meta.env.VITE_TEMPO === "true" && tempoRoutes}
 
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<LoginForm />} />
         <Route path="/signup" element={<SignUpForm />} />
         <Route
-          path="/dashboard"
+          path="/dashboard/*"
           element={
             <PrivateRoute>
               <Dashboard />
@@ -52,7 +59,7 @@ function AppRoutes() {
           }
         />
         <Route
-          path="/documents"
+          path="/documents/*"
           element={
             <PrivateRoute>
               <Documents />
@@ -68,7 +75,19 @@ function AppRoutes() {
           }
         />
         <Route
-          path="/companies"
+          path="/content/:productId"
+          element={
+            <PrivateRoute>
+              <Suspense fallback={<div>Loading...</div>}>
+                {React.createElement(
+                  React.lazy(() => import("./components/content/ProductView")),
+                )}
+              </Suspense>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/companies/*"
           element={
             <PrivateRoute>
               <Companies />
@@ -76,7 +95,7 @@ function AppRoutes() {
           }
         />
         <Route
-          path="/settings"
+          path="/settings/*"
           element={
             <PrivateRoute>
               <Settings />
@@ -84,7 +103,7 @@ function AppRoutes() {
           }
         />
         <Route
-          path="/calendar"
+          path="/calendar/*"
           element={
             <PrivateRoute>
               <Calendar />
@@ -92,7 +111,7 @@ function AppRoutes() {
           }
         />
         <Route
-          path="/users"
+          path="/users/*"
           element={
             <PrivateRoute>
               <Users />
@@ -100,10 +119,18 @@ function AppRoutes() {
           }
         />
         <Route
-          path="/user-management"
+          path="/user-management/*"
           element={
             <PrivateRoute>
               <UserManagement />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/news/*"
+          element={
+            <PrivateRoute>
+              <News />
             </PrivateRoute>
           }
         />

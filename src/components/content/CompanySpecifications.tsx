@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Edit, Save, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -217,85 +216,92 @@ export default function CompanySpecifications({
         )}
       </div>
 
-      <Tabs
-        value={activeCategory}
-        onValueChange={setActiveCategory}
-        className="w-full"
-      >
-        <TabsList className="flex flex-wrap h-auto py-1">
-          {SPECIFICATION_CATEGORIES.map((category) => (
-            <TabsTrigger
-              key={category}
-              value={category}
-              className="my-1 whitespace-nowrap"
-              disabled={isEditing}
-            >
-              {category}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+      <div className="flex gap-6">
+        {/* Lateral Categories Menu */}
+        <div className="w-64 shrink-0">
+          <div className="bg-muted/20 rounded-md p-2">
+            <h3 className="font-medium mb-2 px-2">Categorías</h3>
+            <div className="space-y-1">
+              {SPECIFICATION_CATEGORIES.map((category) => (
+                <button
+                  key={category}
+                  onClick={() => !isEditing && setActiveCategory(category)}
+                  className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                    activeCategory === category
+                      ? "bg-primary text-primary-foreground"
+                      : "hover:bg-muted"
+                  } ${isEditing ? "opacity-50 cursor-not-allowed" : ""}`}
+                  disabled={isEditing}
+                >
+                  {category}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
 
-        {SPECIFICATION_CATEGORIES.map((category) => (
-          <TabsContent key={category} value={category} className="mt-6">
-            {isEditing && activeCategory === category ? (
-              <div className="space-y-4">
-                <Card>
-                  <CardContent className="p-4">
-                    <ReactQuill
-                      theme="snow"
-                      value={editContent}
-                      onChange={setEditContent}
-                      modules={modules}
-                      formats={formats}
-                      className="min-h-[300px]"
-                    />
-                  </CardContent>
-                </Card>
-                <div className="flex justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={handleCancelEdit}
-                    disabled={isSaving}
-                  >
-                    <X className="mr-2 h-4 w-4" /> Cancelar
-                  </Button>
-                  <Button onClick={handleSaveSpecification} disabled={isSaving}>
-                    <Save className="mr-2 h-4 w-4" />
-                    {isSaving ? "Guardando..." : "Guardar"}
-                  </Button>
-                </div>
-              </div>
-            ) : isLoading ? (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">
-                  Cargando especificaciones...
-                </p>
-              </div>
-            ) : specifications.some((spec) => spec.category === category) ? (
+        {/* Content Area */}
+        <div className="flex-1">
+          {isEditing ? (
+            <div className="space-y-4">
               <Card>
-                <CardContent className="p-6">
-                  <div
-                    className="prose max-w-none"
-                    dangerouslySetInnerHTML={{
-                      __html:
-                        specifications.find(
-                          (spec) => spec.category === category,
-                        )?.content || "",
-                    }}
+                <CardContent className="p-4">
+                  <ReactQuill
+                    theme="snow"
+                    value={editContent}
+                    onChange={setEditContent}
+                    modules={modules}
+                    formats={formats}
+                    className="min-h-[300px]"
                   />
                 </CardContent>
               </Card>
-            ) : (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">
-                  No hay especificaciones para esta categoría. Haga clic en
-                  "Editar" para añadir contenido.
-                </p>
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={handleCancelEdit}
+                  disabled={isSaving}
+                >
+                  <X className="mr-2 h-4 w-4" /> Cancelar
+                </Button>
+                <Button onClick={handleSaveSpecification} disabled={isSaving}>
+                  <Save className="mr-2 h-4 w-4" />
+                  {isSaving ? "Guardando..." : "Guardar"}
+                </Button>
               </div>
-            )}
-          </TabsContent>
-        ))}
-      </Tabs>
+            </div>
+          ) : isLoading ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">
+                Cargando especificaciones...
+              </p>
+            </div>
+          ) : specifications.some(
+              (spec) => spec.category === activeCategory,
+            ) ? (
+            <Card>
+              <CardContent className="p-6">
+                <div
+                  className="prose max-w-none"
+                  dangerouslySetInnerHTML={{
+                    __html:
+                      specifications.find(
+                        (spec) => spec.category === activeCategory,
+                      )?.content || "",
+                  }}
+                />
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">
+                No hay especificaciones para esta categoría. Haga clic en
+                "Editar" para añadir contenido.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

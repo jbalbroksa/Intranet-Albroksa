@@ -46,7 +46,7 @@ interface UserEditorProps {
   onCancel?: () => void;
 }
 
-export default function UserEditor({
+function UserEditor({
   initialUser = {
     fullName: "",
     email: "",
@@ -303,3 +303,5 @@ export default function UserEditor({
     </div>
   );
 }
+
+export default UserEditor;

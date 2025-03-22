@@ -9,27 +9,78 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      alerts: {
+        Row: {
+          created_at: string | null
+          created_by: string
+          id: string
+          is_active: boolean | null
+          message: string
+          severity: string
+          title: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by: string
+          id: string
+          is_active?: boolean | null
+          message: string
+          severity: string
+          title: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string
+          id?: string
+          is_active?: boolean | null
+          message?: string
+          severity?: string
+          title?: string
+        }
+        Relationships: []
+      }
       branches: {
         Row: {
           address: string | null
+          city: string | null
+          contact_person: string | null
           created_at: string
+          email: string | null
           id: string
           name: string
+          phone: string | null
+          postal_code: string | null
+          province: string | null
           updated_at: string
+          website: string | null
         }
         Insert: {
           address?: string | null
+          city?: string | null
+          contact_person?: string | null
           created_at?: string
+          email?: string | null
           id?: string
           name: string
+          phone?: string | null
+          postal_code?: string | null
+          province?: string | null
           updated_at?: string
+          website?: string | null
         }
         Update: {
           address?: string | null
+          city?: string | null
+          contact_person?: string | null
           created_at?: string
+          email?: string | null
           id?: string
           name?: string
+          phone?: string | null
+          postal_code?: string | null
+          province?: string | null
           updated_at?: string
+          website?: string | null
         }
         Relationships: []
       }
@@ -292,11 +343,14 @@ export type Database = {
       documents: {
         Row: {
           category: string
+          company_id: string | null
+          content_id: string | null
           description: string | null
           file_path: string
           file_size: string
           file_type: string
           id: string
+          subcategory: string | null
           title: string
           updated_at: string
           uploaded_at: string
@@ -305,11 +359,14 @@ export type Database = {
         }
         Insert: {
           category: string
+          company_id?: string | null
+          content_id?: string | null
           description?: string | null
           file_path: string
           file_size: string
           file_type: string
           id?: string
+          subcategory?: string | null
           title: string
           updated_at?: string
           uploaded_at?: string
@@ -318,11 +375,14 @@ export type Database = {
         }
         Update: {
           category?: string
+          company_id?: string | null
+          content_id?: string | null
           description?: string | null
           file_path?: string
           file_size?: string
           file_type?: string
           id?: string
+          subcategory?: string | null
           title?: string
           updated_at?: string
           uploaded_at?: string
@@ -330,6 +390,20 @@ export type Database = {
           version?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "documents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_content_id_fkey"
+            columns: ["content_id"]
+            isOneToOne: false
+            referencedRelation: "content"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "documents_uploaded_by_fkey"
             columns: ["uploaded_by"]
@@ -465,6 +539,7 @@ export type Database = {
         Row: {
           author_id: string
           category: string
+          company_id: string | null
           content: string
           excerpt: string | null
           id: string
@@ -472,10 +547,12 @@ export type Database = {
           is_pinned: boolean
           published_at: string
           title: string
+          updated_at: string | null
         }
         Insert: {
           author_id: string
           category: string
+          company_id?: string | null
           content: string
           excerpt?: string | null
           id?: string
@@ -483,10 +560,12 @@ export type Database = {
           is_pinned?: boolean
           published_at?: string
           title: string
+          updated_at?: string | null
         }
         Update: {
           author_id?: string
           category?: string
+          company_id?: string | null
           content?: string
           excerpt?: string | null
           id?: string
@@ -494,6 +573,7 @@ export type Database = {
           is_pinned?: boolean
           published_at?: string
           title?: string
+          updated_at?: string | null
         }
         Relationships: [
           {
@@ -503,7 +583,105 @@ export type Database = {
             referencedRelation: "users"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "news_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      news_tags: {
+        Row: {
+          id: string
+          news_id: string
+          tag: string
+        }
+        Insert: {
+          id?: string
+          news_id: string
+          tag: string
+        }
+        Update: {
+          id?: string
+          news_id?: string
+          tag?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "news_tags_news_id_fkey"
+            columns: ["news_id"]
+            isOneToOne: false
+            referencedRelation: "news"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      news_visibility: {
+        Row: {
+          branch: string
+          id: string
+          news_id: string
+          user_type: string
+        }
+        Insert: {
+          branch: string
+          id?: string
+          news_id: string
+          user_type: string
+        }
+        Update: {
+          branch?: string
+          id?: string
+          news_id?: string
+          user_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "news_visibility_news_id_fkey"
+            columns: ["news_id"]
+            isOneToOne: false
+            referencedRelation: "news"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      role_permissions: {
+        Row: {
+          can_create: boolean | null
+          can_delete: boolean | null
+          can_edit: boolean | null
+          can_view: boolean | null
+          created_at: string | null
+          id: string
+          module: string
+          role: string
+          updated_at: string | null
+        }
+        Insert: {
+          can_create?: boolean | null
+          can_delete?: boolean | null
+          can_edit?: boolean | null
+          can_view?: boolean | null
+          created_at?: string | null
+          id?: string
+          module: string
+          role: string
+          updated_at?: string | null
+        }
+        Update: {
+          can_create?: boolean | null
+          can_delete?: boolean | null
+          can_edit?: boolean | null
+          can_view?: boolean | null
+          created_at?: string | null
+          id?: string
+          module?: string
+          role?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       training_courses: {
         Row: {
@@ -586,12 +764,49 @@ export type Database = {
           },
         ]
       }
+      user_type_permissions: {
+        Row: {
+          can_create: boolean | null
+          can_delete: boolean | null
+          can_edit: boolean | null
+          can_view: boolean | null
+          created_at: string | null
+          id: string
+          module: string
+          updated_at: string | null
+          user_type: string
+        }
+        Insert: {
+          can_create?: boolean | null
+          can_delete?: boolean | null
+          can_edit?: boolean | null
+          can_view?: boolean | null
+          created_at?: string | null
+          id?: string
+          module: string
+          updated_at?: string | null
+          user_type: string
+        }
+        Update: {
+          can_create?: boolean | null
+          can_delete?: boolean | null
+          can_edit?: boolean | null
+          can_view?: boolean | null
+          created_at?: string | null
+          id?: string
+          module?: string
+          updated_at?: string | null
+          user_type?: string
+        }
+        Relationships: []
+      }
       users: {
         Row: {
           avatar_url: string | null
           branch: string | null
           created_at: string
           description: string | null
+          email: string | null
           extension: string | null
           full_name: string | null
           id: string
@@ -606,6 +821,7 @@ export type Database = {
           branch?: string | null
           created_at?: string
           description?: string | null
+          email?: string | null
           extension?: string | null
           full_name?: string | null
           id: string
@@ -620,6 +836,7 @@ export type Database = {
           branch?: string | null
           created_at?: string
           description?: string | null
+          email?: string | null
           extension?: string | null
           full_name?: string | null
           id?: string
