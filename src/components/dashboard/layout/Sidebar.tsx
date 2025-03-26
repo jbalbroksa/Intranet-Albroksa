@@ -113,9 +113,9 @@ const Sidebar = ({
   return (
     <div className="w-[280px] h-full bg-background border-r flex flex-col">
       <div className="p-4 md:p-6">
-        <h2 className="text-xl font-semibold mb-2">ConectaSeguros</h2>
+        <h2 className="text-xl font-semibold mb-2">Intranet Albroksa</h2>
         <p className="text-sm text-muted-foreground">
-          Plataforma Intranet de Franquicia
+          Todo lo que necesitas, a tu alcance
         </p>
       </div>
 

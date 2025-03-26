@@ -22,6 +22,8 @@ import { DocumentProps } from "./DocumentCard";
 import { FileUp, X, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/lib/supabase";
+import { uploadDocument } from "@/lib/db/documents";
+import { useToast } from "@/components/ui/use-toast";
 
 interface DocumentUploadDialogProps {
   isOpen: boolean;
@@ -69,6 +71,7 @@ export default function DocumentUploadDialog({
   onUpload,
   categories,
 }: DocumentUploadDialogProps) {
+  const { toast } = useToast();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
@@ -98,10 +101,12 @@ export default function DocumentUploadDialog({
 
   // Fetch companies, categories, and products on mount
   useEffect(() => {
-    fetchCompanies();
-    fetchProductCategories();
-    fetchProducts();
-  }, []);
+    if (isOpen) {
+      fetchCompanies();
+      fetchProductCategories();
+      fetchProducts();
+    }
+  }, [isOpen]);
 
   // Filter products when category or subcategory changes
   useEffect(() => {
@@ -145,6 +150,11 @@ export default function DocumentUploadDialog({
       setCompanies(data || []);
     } catch (error) {
       console.error("Error fetching companies:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar las compañías.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -161,10 +171,15 @@ export default function DocumentUploadDialog({
       // Extract unique categories
       const uniqueCategories = Array.from(
         new Set(data?.map((item) => item.category) || []),
-      );
-      setProductCategories(uniqueCategories);
+      ).filter(Boolean);
+      setProductCategories(uniqueCategories as string[]);
     } catch (error) {
       console.error("Error fetching product categories:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar las categorías de productos.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -185,6 +200,11 @@ export default function DocumentUploadDialog({
       setProductSubcategories(uniqueSubcategories.filter(Boolean) as string[]);
     } catch (error) {
       console.error("Error fetching product subcategories:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar las subcategorías de productos.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -200,6 +220,11 @@ export default function DocumentUploadDialog({
       setFilteredProducts(data || []);
     } catch (error) {
       console.error("Error fetching products:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los productos.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -211,88 +236,48 @@ export default function DocumentUploadDialog({
     setFileError(null);
 
     try {
-      // Get current user
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("User not authenticated");
+      // Upload document using the function from lib/db/documents
+      const documentData = await uploadDocument({
+        file,
+        title,
+        description,
+        category,
+        tags,
+        companyId: selectedCompany !== "none" ? selectedCompany : undefined,
+        contentId: selectedProduct !== "none" ? selectedProduct : undefined,
+        productCategory:
+          selectedProductCategory !== "none"
+            ? selectedProductCategory
+            : undefined,
+        productSubcategory:
+          selectedProductSubcategory !== "none"
+            ? selectedProductSubcategory
+            : undefined,
+      }).catch((error) => {
+        console.error("Error in document upload:", error);
+        throw error;
+      });
 
-      // Upload file to Supabase Storage
-      const fileExt = file.name.split(".").pop() || "";
-      const fileName = `${Date.now()}.${fileExt}`;
-      const filePath = `documents/${user.id}/${fileName}`;
-      const fileSize = (file.size / (1024 * 1024)).toFixed(2) + " MB";
-
-      const { data: fileData, error: uploadError } = await supabase.storage
-        .from("documents")
-        .upload(filePath, file, {
-          upsert: true,
-          contentType: file.type,
-        });
-
-      if (uploadError) throw uploadError;
-
-      // Get public URL
-      const { data: publicUrlData } = supabase.storage
-        .from("documents")
-        .getPublicUrl(filePath);
-
-      const fileUrl = publicUrlData.publicUrl;
-
-      // Create document record in database
-      const { data: documentData, error: documentError } = await supabase
-        .from("documents")
-        .insert({
-          title,
-          description: description || null,
-          file_type: fileExt.toLowerCase(),
-          category: category,
-          file_size: fileSize,
-          version: "1.0",
-          file_path: filePath,
-          uploaded_by: user.id,
-          // Add linking fields
-          company_id: selectedCompany !== "none" ? selectedCompany : null,
-          content_id: selectedProduct !== "none" ? selectedProduct : null,
-          category:
-            selectedProductCategory !== "none" ? selectedProductCategory : null,
-          subcategory:
-            selectedProductSubcategory !== "none"
-              ? selectedProductSubcategory
-              : null,
-        })
-        .select()
-        .single();
-
-      if (documentError) throw documentError;
-
-      // Add tags if provided
-      if (tags.length > 0) {
-        const tagInserts = tags.map((tag) => ({
-          document_id: documentData.id,
-          tag,
-        }));
-
-        const { error: tagError } = await supabase
-          .from("document_tags")
-          .insert(tagInserts);
-
-        if (tagError) throw tagError;
-      }
+      // Get public URL for the uploaded file
+      const fileUrl = documentData.file_path
+        ? supabase.storage
+            .from("documents")
+            .getPublicUrl(documentData.file_path).data.publicUrl
+        : undefined;
 
       // Create document object for UI update
       const newDocument: DocumentProps = {
         id: documentData.id,
         title,
         description,
-        fileType: fileExt.toLowerCase(),
+        fileType: file.name.split(".").pop()?.toLowerCase() || "unknown",
         category,
         uploadedBy: {
-          name: "Current User", // In a real app, this would be the current user
+          name: "Usuario Actual", // This would be replaced with the actual user name
           avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=CurrentUser",
         },
         uploadedAt: new Date(),
-        fileSize: fileSize,
+        fileSize: (file.size / (1024 * 1024)).toFixed(2) + " MB",
         version: "1.0",
         tags,
         fileUrl,
@@ -319,9 +304,21 @@ export default function DocumentUploadDialog({
 
       onUpload(newDocument);
       resetForm();
+      toast({
+        title: "Documento subido",
+        description: "El documento se ha subido correctamente.",
+      });
     } catch (error) {
       console.error("Error uploading document:", error);
-      setFileError("Error uploading document. Please try again.");
+      setFileError(
+        "Error al subir el documento. Por favor, inténtelo de nuevo.",
+      );
+      toast({
+        title: "Error",
+        description:
+          "No se pudo subir el documento. Por favor, inténtelo de nuevo.",
+        variant: "destructive",
+      });
     } finally {
       setIsUploading(false);
     }
@@ -481,7 +478,9 @@ export default function DocumentUploadDialog({
                 value={selectedProductSubcategory}
                 onValueChange={setSelectedProductSubcategory}
                 disabled={
-                  !selectedProductCategory || productSubcategories.length === 0
+                  !selectedProductCategory ||
+                  selectedProductCategory === "none" ||
+                  productSubcategories.length === 0
                 }
               >
                 <SelectTrigger>

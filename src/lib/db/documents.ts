@@ -8,105 +8,115 @@ type DocumentTag = Database["public"]["Tables"]["document_tags"]["Row"];
  * Get all documents with their tags
  */
 export async function getDocuments() {
-  const { data, error } = await supabase
-    .from("documents")
-    .select(
-      `
-      *,
-      users:uploaded_by(id, full_name, avatar_url),
-      document_tags(id, tag),
-      companies:company_id(id, name),
-      content:content_id(id, title)
-    `,
-    )
-    .order("uploaded_at", { ascending: false });
+  try {
+    const { data, error } = await supabase
+      .from("documents")
+      .select(
+        `
+        *,
+        users:uploaded_by(id, full_name, avatar_url),
+        document_tags(id, tag),
+        companies:company_id(id, name),
+        content:content_id(id, title)
+      `,
+      )
+      .order("uploaded_at", { ascending: false });
 
-  if (error) {
-    console.error("Error fetching documents:", error);
+    if (error) {
+      console.error("Error fetching documents:", error);
+      return [];
+    }
+
+    return data.map((doc) => ({
+      id: doc.id,
+      title: doc.title,
+      description: doc.description,
+      fileType: doc.file_type,
+      category: doc.category,
+      uploadedBy: {
+        name: doc.users?.full_name || "Usuario",
+        avatar:
+          doc.users?.avatar_url ||
+          `https://api.dicebear.com/7.x/avataaars/svg?seed=${doc.uploaded_by}`,
+      },
+      uploadedAt: new Date(doc.uploaded_at),
+      fileSize: doc.file_size,
+      version: doc.version,
+      tags: doc.document_tags?.map((tag) => tag.tag) || [],
+      fileUrl: doc.file_path
+        ? supabase.storage.from("documents").getPublicUrl(doc.file_path).data
+            .publicUrl
+        : undefined,
+      // Add linked entity information
+      companyId: doc.company_id || undefined,
+      companyName: doc.companies?.name || undefined,
+      productId: doc.content_id || undefined,
+      productTitle: doc.content?.title || undefined,
+      productCategory: doc.category || undefined,
+      productSubcategory: doc.subcategory || undefined,
+    }));
+  } catch (error) {
+    console.error("Error in getDocuments:", error);
     return [];
   }
-
-  return data.map((doc) => ({
-    id: doc.id,
-    title: doc.title,
-    description: doc.description,
-    fileType: doc.file_type,
-    category: doc.category,
-    uploadedBy: {
-      name: doc.users?.full_name || "Usuario",
-      avatar:
-        doc.users?.avatar_url ||
-        `https://api.dicebear.com/7.x/avataaars/svg?seed=${doc.uploaded_by}`,
-    },
-    uploadedAt: new Date(doc.uploaded_at),
-    fileSize: doc.file_size,
-    version: doc.version,
-    tags: doc.document_tags?.map((tag) => tag.tag) || [],
-    fileUrl: doc.file_path
-      ? supabase.storage.from("documents").getPublicUrl(doc.file_path).data
-          .publicUrl
-      : undefined,
-    // Add linked entity information
-    companyId: doc.company_id || undefined,
-    companyName: doc.companies?.name || undefined,
-    productId: doc.content_id || undefined,
-    productTitle: doc.content?.title || undefined,
-    productCategory: doc.category || undefined,
-    productSubcategory: doc.subcategory || undefined,
-  }));
 }
 
 /**
  * Get a document by ID
  */
 export async function getDocumentById(id: string) {
-  const { data, error } = await supabase
-    .from("documents")
-    .select(
-      `
-      *,
-      users:uploaded_by(id, full_name, avatar_url),
-      document_tags(id, tag),
-      companies:company_id(id, name),
-      content:content_id(id, title)
-    `,
-    )
-    .eq("id", id)
-    .single();
+  try {
+    const { data, error } = await supabase
+      .from("documents")
+      .select(
+        `
+        *,
+        users:uploaded_by(id, full_name, avatar_url),
+        document_tags(id, tag),
+        companies:company_id(id, name),
+        content:content_id(id, title)
+      `,
+      )
+      .eq("id", id)
+      .single();
 
-  if (error) {
-    console.error("Error fetching document:", error);
+    if (error) {
+      console.error("Error fetching document:", error);
+      return null;
+    }
+
+    return {
+      id: data.id,
+      title: data.title,
+      description: data.description,
+      fileType: data.file_type,
+      category: data.category,
+      uploadedBy: {
+        name: data.users?.full_name || "Usuario",
+        avatar:
+          data.users?.avatar_url ||
+          `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.uploaded_by}`,
+      },
+      uploadedAt: new Date(data.uploaded_at),
+      fileSize: data.file_size,
+      version: data.version,
+      tags: data.document_tags?.map((tag) => tag.tag) || [],
+      fileUrl: data.file_path
+        ? supabase.storage.from("documents").getPublicUrl(data.file_path).data
+            .publicUrl
+        : undefined,
+      // Add linked entity information
+      companyId: data.company_id || undefined,
+      companyName: data.companies?.name || undefined,
+      productId: data.content_id || undefined,
+      productTitle: data.content?.title || undefined,
+      productCategory: data.category || undefined,
+      productSubcategory: data.subcategory || undefined,
+    };
+  } catch (error) {
+    console.error("Error in getDocumentById:", error);
     return null;
   }
-
-  return {
-    id: data.id,
-    title: data.title,
-    description: data.description,
-    fileType: data.file_type,
-    category: data.category,
-    uploadedBy: {
-      name: data.users?.full_name || "Usuario",
-      avatar:
-        data.users?.avatar_url ||
-        `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.uploaded_by}`,
-    },
-    uploadedAt: new Date(data.uploaded_at),
-    fileSize: data.file_size,
-    version: data.version,
-    tags: data.document_tags?.map((tag) => tag.tag) || [],
-    fileUrl: data.file_path
-      ? supabase.storage.from("documents").getPublicUrl(data.file_path).data
-          .publicUrl
-      : undefined,
-    // Add linked entity information
-    companyId: data.company_id || undefined,
-    companyName: data.companies?.name || undefined,
-    productId: data.content_id || undefined,
-    productTitle: data.content?.title || undefined,
-    productCategory: data.category || undefined,
-    productSubcategory: data.subcategory || undefined,
-  };
 }
 
 /**
@@ -135,11 +145,20 @@ export async function uploadDocument(document: {
     const filePath = `documents/${user.id}/${Date.now()}.${fileExt}`;
     const fileSize = (document.file.size / (1024 * 1024)).toFixed(2) + " MB";
 
+    // We'll assume the bucket exists as it should be created by migrations
+    // If there's an error during upload, we'll handle it in the upload section
+
     const { error: uploadError } = await supabase.storage
       .from("documents")
-      .upload(filePath, document.file);
+      .upload(filePath, document.file, {
+        upsert: true,
+        contentType: document.file.type,
+      });
 
-    if (uploadError) throw uploadError;
+    if (uploadError) {
+      console.error("Error uploading file:", uploadError);
+      throw uploadError;
+    }
 
     // Create document record
     const { data, error } = await supabase
@@ -156,13 +175,15 @@ export async function uploadDocument(document: {
         // Add linking fields
         company_id: document.companyId || null,
         content_id: document.contentId || null,
-        category: document.productCategory || null,
         subcategory: document.productSubcategory || null,
       })
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error("Error creating document record:", error);
+      throw error;
+    }
 
     // Add tags if provided
     if (document.tags && document.tags.length > 0) {
@@ -175,7 +196,10 @@ export async function uploadDocument(document: {
         .from("document_tags")
         .insert(tagInserts);
 
-      if (tagError) throw tagError;
+      if (tagError) {
+        console.error("Error adding document tags:", tagError);
+        throw tagError;
+      }
     }
 
     return data;
@@ -203,13 +227,19 @@ export async function deleteDocument(id: string) {
         .from("documents")
         .remove([document.file_path]);
 
-      if (storageError) throw storageError;
+      if (storageError) {
+        console.error("Error removing document file:", storageError);
+        throw storageError;
+      }
     }
 
     // Delete document record (tags will be deleted via cascade)
     const { error } = await supabase.from("documents").delete().eq("id", id);
 
-    if (error) throw error;
+    if (error) {
+      console.error("Error deleting document record:", error);
+      throw error;
+    }
 
     return true;
   } catch (error) {

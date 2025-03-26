@@ -8,7 +8,7 @@ const Dashboard = () => {
     <DashboardLayout activeItem="Dashboard">
       <DashboardShell
         title="Dashboard"
-        description="Overview of your insurance franchise intranet platform"
+        description="Overview of your franchise"
       >
         <DashboardOverview />
       </DashboardShell>
