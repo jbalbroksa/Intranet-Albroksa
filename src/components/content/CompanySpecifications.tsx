@@ -1,7 +1,17 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Edit, Save, X } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Edit, Save, X, PlusCircle, Trash } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -20,6 +30,12 @@ interface SpecificationItem {
   subcategory?: string;
   content: string;
   updatedAt: Date;
+}
+
+interface SubcategoryItem {
+  id: string;
+  name: string;
+  parent_category: string;
 }
 
 const SPECIFICATION_CATEGORIES = [
@@ -66,17 +82,25 @@ export default function CompanySpecifications({
 }: CompanySpecificationsProps) {
   const { toast } = useToast();
   const [specifications, setSpecifications] = useState<SpecificationItem[]>([]);
+  const [subcategories, setSubcategories] = useState<SubcategoryItem[]>([]);
   const [activeCategory, setActiveCategory] = useState(
     SPECIFICATION_CATEGORIES[0],
+  );
+  const [activeSubcategory, setActiveSubcategory] = useState<string | null>(
+    null,
   );
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isAddingSubcategory, setIsAddingSubcategory] = useState(false);
+  const [newSubcategoryName, setNewSubcategoryName] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Fetch specifications for this company
   useEffect(() => {
     fetchSpecifications();
+    fetchSubcategories();
   }, [companyId]);
 
   const fetchSpecifications = async () => {
@@ -112,9 +136,40 @@ export default function CompanySpecifications({
     }
   };
 
-  // Get the specification for the current active category
-  const currentSpecification = specifications.find(
-    (spec) => spec.category === activeCategory,
+  // Fetch subcategories for specifications
+  const fetchSubcategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("specification_subcategories")
+        .select("*")
+        .order("name", { ascending: true });
+
+      if (error) throw error;
+      setSubcategories(data || []);
+    } catch (error) {
+      console.error("Error fetching subcategories:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar las subcategorías",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Get the specification for the current active category and subcategory
+  const currentSpecification = specifications.find((spec) => {
+    if (activeSubcategory) {
+      return (
+        spec.category === activeCategory &&
+        spec.subcategory === activeSubcategory
+      );
+    }
+    return spec.category === activeCategory && !spec.subcategory;
+  });
+
+  // Get filtered subcategories for the current active category
+  const filteredSubcategories = subcategories.filter(
+    (subcat) => subcat.parent_category === activeCategory,
   );
 
   const handleEditClick = () => {
@@ -124,6 +179,74 @@ export default function CompanySpecifications({
 
   const handleCancelEdit = () => {
     setIsEditing(false);
+  };
+
+  const handleAddSubcategory = async () => {
+    if (!newSubcategoryName.trim()) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("specification_subcategories")
+        .insert({
+          name: newSubcategoryName.trim(),
+          parent_category: activeCategory,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setSubcategories([...subcategories, data]);
+      setNewSubcategoryName("");
+      setIsAddingSubcategory(false);
+
+      toast({
+        title: "Subcategoría añadida",
+        description: "La subcategoría ha sido añadida correctamente",
+      });
+    } catch (error) {
+      console.error("Error adding subcategory:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo añadir la subcategoría",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteSpecification = async () => {
+    if (!currentSpecification) return;
+
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from("company_specifications")
+        .delete()
+        .eq("id", currentSpecification.id);
+
+      if (error) throw error;
+
+      // Update local state
+      setSpecifications(
+        specifications.filter((spec) => spec.id !== currentSpecification.id),
+      );
+
+      toast({
+        title: "Especificación eliminada",
+        description: "La especificación ha sido eliminada correctamente",
+      });
+
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Error deleting specification:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar la especificación",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleSaveSpecification = async () => {
@@ -165,6 +288,7 @@ export default function CompanySpecifications({
           .insert({
             company_id: companyId,
             category: activeCategory,
+            subcategory: activeSubcategory || undefined,
             content: editContent,
           })
           .select()
@@ -205,31 +329,86 @@ export default function CompanySpecifications({
 
   return (
     <div className="space-y-6">
+      {/* Add Subcategory Dialog */}
+      <Dialog open={isAddingSubcategory} onOpenChange={setIsAddingSubcategory}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Añadir Subcategoría</DialogTitle>
+            <DialogDescription>
+              Cree una nueva subcategoría para {activeCategory}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="subcategoryName">Nombre de la Subcategoría</Label>
+              <Input
+                id="subcategoryName"
+                value={newSubcategoryName}
+                onChange={(e) => setNewSubcategoryName(e.target.value)}
+                placeholder="Nombre de la subcategoría"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsAddingSubcategory(false)}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={handleAddSubcategory}>Añadir</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">
           Especificaciones Particulares: {companyName}
         </h2>
-        {!isEditing && (
-          <Button onClick={handleEditClick}>
-            <Edit className="mr-2 h-4 w-4" /> Editar
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {!isEditing && (
+            <Button onClick={() => setIsAddingSubcategory(true)}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Añadir Subcategoría
+            </Button>
+          )}
+          {!isEditing && (
+            <Button onClick={handleEditClick}>
+              <Edit className="mr-2 h-4 w-4" /> Editar
+            </Button>
+          )}
+          {!isEditing && currentSpecification && (
+            <Button
+              variant="destructive"
+              onClick={handleDeleteSpecification}
+              disabled={isDeleting}
+            >
+              <Trash className="mr-2 h-4 w-4" />
+              {isDeleting ? "Eliminando..." : "Eliminar"}
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="flex gap-6">
         {/* Lateral Categories Menu */}
-        <div className="w-64 shrink-0">
+        <div className="w-64 shrink-0 space-y-4">
           <div className="bg-muted/20 rounded-md p-2">
             <h3 className="font-medium mb-2 px-2">Categorías</h3>
             <div className="space-y-1">
               {SPECIFICATION_CATEGORIES.map((category) => (
                 <button
                   key={category}
-                  onClick={() => !isEditing && setActiveCategory(category)}
+                  onClick={() => {
+                    if (!isEditing) {
+                      setActiveCategory(category);
+                      setActiveSubcategory(null);
+                    }
+                  }}
                   className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
-                    activeCategory === category
+                    activeCategory === category && !activeSubcategory
                       ? "bg-primary text-primary-foreground"
-                      : "hover:bg-muted"
+                      : activeCategory === category
+                        ? "bg-primary/20 text-primary"
+                        : "hover:bg-muted"
                   } ${isEditing ? "opacity-50 cursor-not-allowed" : ""}`}
                   disabled={isEditing}
                 >
@@ -238,6 +417,34 @@ export default function CompanySpecifications({
               ))}
             </div>
           </div>
+
+          {filteredSubcategories.length > 0 && (
+            <div className="bg-muted/20 rounded-md p-2">
+              <h3 className="font-medium mb-2 px-2">
+                Subcategorías de {activeCategory}
+              </h3>
+              <div className="space-y-1">
+                {filteredSubcategories.map((subcat) => (
+                  <button
+                    key={subcat.id}
+                    onClick={() => {
+                      if (!isEditing) {
+                        setActiveSubcategory(subcat.id);
+                      }
+                    }}
+                    className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                      activeSubcategory === subcat.id
+                        ? "bg-primary text-primary-foreground"
+                        : "hover:bg-muted"
+                    } ${isEditing ? "opacity-50 cursor-not-allowed" : ""}`}
+                    disabled={isEditing}
+                  >
+                    {subcat.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Content Area */}

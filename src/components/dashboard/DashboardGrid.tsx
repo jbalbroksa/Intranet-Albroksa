@@ -15,61 +15,7 @@ interface DashboardGridProps {
   projects?: ProjectCardProps[];
 }
 
-const defaultProjects: ProjectCardProps[] = [
-  {
-    title: "Website Redesign",
-    progress: 75,
-    team: [
-      {
-        name: "Alice",
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Alice",
-      },
-      {
-        name: "Bob",
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Bob",
-      },
-      {
-        name: "Charlie",
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Charlie",
-      },
-    ],
-    dueDate: "2024-04-15",
-  },
-  {
-    title: "Mobile App Development",
-    progress: 45,
-    team: [
-      {
-        name: "David",
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=David",
-      },
-      {
-        name: "Eve",
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Eve",
-      },
-    ],
-    dueDate: "2024-05-01",
-  },
-  {
-    title: "Marketing Campaign",
-    progress: 90,
-    team: [
-      {
-        name: "Frank",
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Frank",
-      },
-      {
-        name: "Grace",
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Grace",
-      },
-      {
-        name: "Henry",
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Henry",
-      },
-    ],
-    dueDate: "2024-03-30",
-  },
-];
+const defaultProjects: ProjectCardProps[] = [];
 
 const ProjectCard = ({ title, progress, team, dueDate }: ProjectCardProps) => {
   return (

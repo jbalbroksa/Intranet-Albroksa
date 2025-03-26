@@ -9,7 +9,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Filter, PlusCircle, Search, ArrowLeft } from "lucide-react";
+import {
+  Filter,
+  PlusCircle,
+  Search,
+  ArrowLeft,
+  LayoutGrid,
+  List,
+} from "lucide-react";
 import CompanyCard from "./CompanyCard";
 import CompanyEditor from "./CompanyEditor";
 import CompanySpecifications from "./CompanySpecifications";
@@ -48,6 +55,7 @@ export default function CompanyList() {
     null,
   );
   const [isLoading, setIsLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
   // Fetch companies
   useEffect(() => {
@@ -264,9 +272,31 @@ export default function CompanyList() {
     <div className="h-full flex flex-col">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold">Gestión de Compañías</h1>
-        <Button onClick={handleCreateCompany}>
-          <PlusCircle className="mr-2 h-4 w-4" /> Crear Compañía
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="bg-muted rounded-md flex items-center p-1">
+            <Button
+              variant={viewMode === "grid" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => setViewMode("grid")}
+              aria-label="Vista de cuadrícula"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === "table" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => setViewMode("table")}
+              aria-label="Vista de tabla"
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
+          <Button onClick={handleCreateCompany}>
+            <PlusCircle className="mr-2 h-4 w-4" /> Crear Compañía
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col md:flex-row gap-4 mb-6">
@@ -310,7 +340,7 @@ export default function CompanyList() {
             No se encontraron compañías. Intente ajustar su búsqueda o filtros.
           </p>
         </div>
-      ) : (
+      ) : viewMode === "grid" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredCompanies.map((company) => (
             <CompanyCard
@@ -321,6 +351,91 @@ export default function CompanyList() {
               onViewSpecifications={() => handleViewSpecifications(company.id)}
             />
           ))}
+        </div>
+      ) : (
+        <div className="rounded-md border">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-muted/50">
+                <th className="p-2 text-left font-medium">Nombre</th>
+                <th className="p-2 text-left font-medium">Clasificación</th>
+                <th className="p-2 text-left font-medium">Sitio Web</th>
+                <th className="p-2 text-left font-medium">Contacto</th>
+                <th className="p-2 text-center font-medium">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredCompanies.map((company) => (
+                <tr key={company.id} className="border-t hover:bg-muted/50">
+                  <td className="p-2">
+                    <div className="flex items-center gap-2">
+                      {company.logo && (
+                        <img
+                          src={company.logo}
+                          alt={company.name}
+                          className="h-8 w-8 rounded-md object-contain"
+                        />
+                      )}
+                      <span className="font-medium">{company.name}</span>
+                    </div>
+                  </td>
+                  <td className="p-2">{company.classification}</td>
+                  <td className="p-2">
+                    {company.website ? (
+                      <a
+                        href={company.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline"
+                      >
+                        {company.website}
+                      </a>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </td>
+                  <td className="p-2">
+                    {company.contactEmail ? (
+                      <a
+                        href={`mailto:${company.contactEmail}`}
+                        className="text-blue-600 hover:underline"
+                      >
+                        {company.contactEmail}
+                      </a>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </td>
+                  <td className="p-2">
+                    <div className="flex justify-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleViewSpecifications(company.id)}
+                      >
+                        Ver
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEditCompany(company.id)}
+                      >
+                        Editar
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteCompany(company.id)}
+                        className="text-red-500"
+                      >
+                        Eliminar
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

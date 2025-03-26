@@ -20,15 +20,15 @@ export default function DashboardOverview() {
       title: "Documentos",
       value: "0",
       description: "Total documentos",
-      icon: <FileText className="h-5 w-5 text-muted-foreground" />,
+      icon: <FileText className="h-5 w-5 text-corporate-primary" />,
       change: "Sin cambios",
       trend: "neutral",
     },
     {
       title: "Usuarios",
-      value: "1",
+      value: "0",
       description: "Usuarios activos",
-      icon: <Users className="h-5 w-5 text-muted-foreground" />,
+      icon: <Users className="h-5 w-5 text-corporate-primary" />,
       change: "Sin cambios",
       trend: "neutral",
     },
@@ -36,7 +36,7 @@ export default function DashboardOverview() {
       title: "Compañías",
       value: "0",
       description: "Compañías de seguros",
-      icon: <BookOpen className="h-5 w-5 text-muted-foreground" />,
+      icon: <BookOpen className="h-5 w-5 text-corporate-primary" />,
       change: "Sin cambios",
       trend: "neutral",
     },
@@ -44,7 +44,7 @@ export default function DashboardOverview() {
       title: "Eventos",
       value: "0",
       description: "Próximos eventos",
-      icon: <Calendar className="h-5 w-5 text-muted-foreground" />,
+      icon: <Calendar className="h-5 w-5 text-corporate-primary" />,
       change: "Sin eventos",
       trend: "neutral",
     },
@@ -53,11 +53,12 @@ export default function DashboardOverview() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight">
-          Welcome back, {profile?.full_name || "User"}
+        <h2 className="text-3xl font-bold tracking-tight text-corporate-secondary">
+          Bienvenido, {profile?.full_name || "Usuario"}
         </h2>
         <p className="text-muted-foreground">
-          Here's an overview of your insurance franchise intranet platform
+          Aquí tienes un resumen de tu plataforma intranet de correduría de
+          seguros
         </p>
       </div>
 

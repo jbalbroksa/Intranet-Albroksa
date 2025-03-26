@@ -5,7 +5,6 @@ export default function NewsPage() {
   return (
     <DashboardLayout activeItem="Noticias">
       <div className="w-full">
-        <h1 className="text-2xl font-bold mb-6">Noticias</h1>
         <NewsList />
       </div>
     </DashboardLayout>

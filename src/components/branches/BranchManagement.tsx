@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Filter, PlusCircle, Search } from "lucide-react";
+import { Filter, PlusCircle, Search, LayoutGrid, List } from "lucide-react";
 import BranchCard from "./BranchCard";
 import BranchEditor from "./BranchEditor";
 import { supabase } from "@/lib/supabase";
@@ -40,6 +40,7 @@ export default function BranchManagement() {
   const [isEditing, setIsEditing] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState<BranchItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
   // Fetch branches
   useEffect(() => {
@@ -253,9 +254,31 @@ export default function BranchManagement() {
     <div className="h-full flex flex-col">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold">Gestión de Sucursales</h1>
-        <Button onClick={handleCreateBranch}>
-          <PlusCircle className="mr-2 h-4 w-4" /> Crear Sucursal
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="bg-muted rounded-md flex items-center p-1">
+            <Button
+              variant={viewMode === "grid" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => setViewMode("grid")}
+              aria-label="Vista de cuadrícula"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === "table" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => setViewMode("table")}
+              aria-label="Vista de tabla"
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
+          <Button onClick={handleCreateBranch}>
+            <PlusCircle className="mr-2 h-4 w-4" /> Crear Sucursal
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col md:flex-row gap-4 mb-6">
@@ -296,7 +319,7 @@ export default function BranchManagement() {
             No se encontraron sucursales. Intente ajustar su búsqueda o filtros.
           </p>
         </div>
-      ) : (
+      ) : viewMode === "grid" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredBranches.map((branch) => (
             <BranchCard
@@ -306,6 +329,67 @@ export default function BranchManagement() {
               onDelete={() => handleDeleteBranch(branch.id)}
             />
           ))}
+        </div>
+      ) : (
+        <div className="rounded-md border">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-muted/50">
+                <th className="p-2 text-left font-medium">Nombre</th>
+                <th className="p-2 text-left font-medium">Dirección</th>
+                <th className="p-2 text-left font-medium">Ciudad</th>
+                <th className="p-2 text-left font-medium">Provincia</th>
+                <th className="p-2 text-left font-medium">Contacto</th>
+                <th className="p-2 text-center font-medium">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredBranches.map((branch) => (
+                <tr key={branch.id} className="border-t hover:bg-muted/50">
+                  <td className="p-2 font-medium">{branch.name}</td>
+                  <td className="p-2">{branch.address}</td>
+                  <td className="p-2">{branch.city}</td>
+                  <td className="p-2">{branch.province}</td>
+                  <td className="p-2">
+                    {branch.contactPerson ? (
+                      <div>
+                        <div>{branch.contactPerson}</div>
+                        {branch.email && (
+                          <a
+                            href={`mailto:${branch.email}`}
+                            className="text-blue-600 hover:underline text-sm"
+                          >
+                            {branch.email}
+                          </a>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </td>
+                  <td className="p-2">
+                    <div className="flex justify-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEditBranch(branch.id)}
+                      >
+                        Editar
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteBranch(branch.id)}
+                        className="text-red-500"
+                      >
+                        Eliminar
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

@@ -40,7 +40,9 @@ interface Subcategory {
   id: string;
   name: string;
   parent_category: string;
+  parent_subcategory?: string;
   created_at: string;
+  level: number;
 }
 
 export default function CategoryManager() {
@@ -54,6 +56,7 @@ export default function CategoryManager() {
   );
   const [editingSubcategory, setEditingSubcategory] =
     useState<Subcategory | null>(null);
+  const [isAddingSubSubcategory, setIsAddingSubSubcategory] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -67,11 +70,19 @@ export default function CategoryManager() {
         .from("content_subcategories")
         .select("*")
         .order("parent_category", { ascending: true })
+        .order("level", { ascending: true })
         .order("name", { ascending: true });
 
       if (error) throw error;
 
-      setSubcategories(data || []);
+      // Ensure all subcategories have a level property
+      const processedData =
+        data?.map((item) => ({
+          ...item,
+          level: item.level || 1, // Default to level 1 if not set
+        })) || [];
+
+      setSubcategories(processedData);
     } catch (error) {
       console.error("Error fetching subcategories:", error);
       toast({
@@ -88,14 +99,32 @@ export default function CategoryManager() {
     if (!newSubcategoryName.trim()) return;
 
     try {
-      // Format the subcategory name as "parent/name"
-      const fullName = `${selectedParentCategory}/${newSubcategoryName.trim()}`;
+      // Determine if we're adding to a main category or a subcategory
+      const isAddingToSubcategory =
+        editingSubcategory && isAddingSubSubcategory;
+
+      // Format the subcategory name appropriately
+      let fullName = "";
+      let parentSubcategoryId = null;
+      let level = 1; // Default level for direct subcategories of main categories
+
+      if (isAddingToSubcategory && editingSubcategory) {
+        // Adding a sub-subcategory
+        fullName = `${editingSubcategory.name}/${newSubcategoryName.trim()}`;
+        parentSubcategoryId = editingSubcategory.id;
+        level = editingSubcategory.level + 1;
+      } else {
+        // Adding a regular subcategory to a main category
+        fullName = `${selectedParentCategory}/${newSubcategoryName.trim()}`;
+      }
 
       const { data, error } = await supabase
         .from("content_subcategories")
         .insert({
           name: fullName,
           parent_category: selectedParentCategory,
+          parent_subcategory: parentSubcategoryId,
+          level: level,
         })
         .select()
         .single();
@@ -105,6 +134,8 @@ export default function CategoryManager() {
       setSubcategories([...subcategories, data]);
       setNewSubcategoryName("");
       setIsAddDialogOpen(false);
+      setIsAddingSubSubcategory(false);
+      setEditingSubcategory(null);
 
       toast({
         title: "Subcategoría añadida",
@@ -248,19 +279,70 @@ export default function CategoryManager() {
                 <TableBody>
                   {subcategories.map((subcategory) => {
                     const nameParts = subcategory.name.split("/");
-                    const displayName =
-                      nameParts.length > 1 ? nameParts[1] : subcategory.name;
+                    const displayName = nameParts[nameParts.length - 1];
+                    const indentClass =
+                      subcategory.level > 1
+                        ? `pl-${Math.min(subcategory.level * 4, 12)}`
+                        : "";
+                    const parentSubcategory = subcategory.parent_subcategory
+                      ? subcategories.find(
+                          (s) => s.id === subcategory.parent_subcategory,
+                        )
+                      : null;
+                    const parentName = parentSubcategory
+                      ? parentSubcategory.name.split("/").pop()
+                      : null;
 
                     return (
                       <TableRow key={subcategory.id}>
-                        <TableCell>{displayName}</TableCell>
-                        <TableCell>{subcategory.parent_category}</TableCell>
+                        <TableCell>
+                          <div className={`flex items-center ${indentClass}`}>
+                            {subcategory.level > 1 && (
+                              <span className="text-muted-foreground text-xs mr-2">
+                                ↳
+                              </span>
+                            )}
+                            {displayName}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {subcategory.level > 1 && parentName ? (
+                            <div className="flex items-center">
+                              <span>{subcategory.parent_category}</span>
+                              <span className="mx-1 text-muted-foreground">
+                                →
+                              </span>
+                              <span className="text-muted-foreground">
+                                {parentName}
+                              </span>
+                            </div>
+                          ) : (
+                            subcategory.parent_category
+                          )}
+                        </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
                             <Button
                               variant="ghost"
                               size="icon"
+                              onClick={() => {
+                                setIsAddDialogOpen(true);
+                                setEditingSubcategory(subcategory);
+                                setIsAddingSubSubcategory(true);
+                                setSelectedParentCategory(
+                                  subcategory.parent_category,
+                                );
+                                setNewSubcategoryName("");
+                              }}
+                              title="Añadir subcategoría"
+                            >
+                              <PlusCircle className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
                               onClick={() => openEditDialog(subcategory)}
+                              title="Editar"
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
@@ -271,6 +353,7 @@ export default function CategoryManager() {
                                 handleDeleteSubcategory(subcategory.id)
                               }
                               className="text-red-500 hover:text-red-700"
+                              title="Eliminar"
                             >
                               <Trash className="h-4 w-4" />
                             </Button>
@@ -287,45 +370,93 @@ export default function CategoryManager() {
       </div>
 
       {/* Add Subcategory Dialog */}
-      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+      <Dialog
+        open={isAddDialogOpen}
+        onOpenChange={(open) => {
+          setIsAddDialogOpen(open);
+          if (!open) {
+            setIsAddingSubSubcategory(false);
+            setEditingSubcategory(null);
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Añadir Subcategoría</DialogTitle>
+            <DialogTitle>
+              {isAddingSubSubcategory
+                ? "Añadir Subcategoría Anidada"
+                : "Añadir Subcategoría"}
+            </DialogTitle>
             <DialogDescription>
-              Cree una nueva subcategoría para organizar los productos.
+              {isAddingSubSubcategory
+                ? `Cree una nueva subcategoría dentro de "${editingSubcategory?.name.split("/").pop()}"`
+                : "Cree una nueva subcategoría para organizar los productos."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {!isAddingSubSubcategory && (
+              <div className="space-y-2">
+                <Label htmlFor="parentCategory">Categoría Principal</Label>
+                <Select
+                  value={selectedParentCategory}
+                  onValueChange={setSelectedParentCategory}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccione una categoría principal" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MAIN_CATEGORIES.map((category) => (
+                      <SelectItem key={category} value={category}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {isAddingSubSubcategory && editingSubcategory && (
+              <div className="space-y-2">
+                <Label>Categoría Principal</Label>
+                <div className="p-2 border rounded-md bg-muted/20">
+                  {editingSubcategory.parent_category}
+                </div>
+              </div>
+            )}
+            {isAddingSubSubcategory && editingSubcategory && (
+              <div className="space-y-2">
+                <Label>Subcategoría Padre</Label>
+                <div className="p-2 border rounded-md bg-muted/20">
+                  {editingSubcategory.name.split("/").pop()}
+                </div>
+              </div>
+            )}
             <div className="space-y-2">
-              <Label htmlFor="parentCategory">Categoría Principal</Label>
-              <Select
-                value={selectedParentCategory}
-                onValueChange={setSelectedParentCategory}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccione una categoría principal" />
-                </SelectTrigger>
-                <SelectContent>
-                  {MAIN_CATEGORIES.map((category) => (
-                    <SelectItem key={category} value={category}>
-                      {category}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="subcategoryName">Nombre de la Subcategoría</Label>
+              <Label htmlFor="subcategoryName">
+                {isAddingSubSubcategory
+                  ? "Nombre de la Subcategoría Anidada"
+                  : "Nombre de la Subcategoría"}
+              </Label>
               <Input
                 id="subcategoryName"
                 value={newSubcategoryName}
                 onChange={(e) => setNewSubcategoryName(e.target.value)}
-                placeholder="Nombre de la subcategoría"
+                placeholder={
+                  isAddingSubSubcategory
+                    ? "Nombre de la subcategoría anidada"
+                    : "Nombre de la subcategoría"
+                }
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsAddDialogOpen(false);
+                setIsAddingSubSubcategory(false);
+                setEditingSubcategory(null);
+              }}
+            >
               Cancelar
             </Button>
             <Button onClick={handleAddSubcategory}>Añadir</Button>

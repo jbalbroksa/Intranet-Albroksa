@@ -1,69 +1,16 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { UserPlus } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserPlus, LayoutGrid, List } from "lucide-react";
 import UserTable, { User } from "./UserTable";
 import UserFilters from "./UserFilters";
 import AddUserDialog from "./AddUserDialog";
 import { useToast } from "@/components/ui/use-toast";
+import { Card } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase";
 
 // Initial mock data for development
-const MOCK_USERS: User[] = [
-  {
-    id: "1",
-    name: "John Smith",
-    email: "john.smith@example.com",
-    role: "admin",
-    status: "active",
-    lastActive: new Date(2024, 6, 15),
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=John",
-  },
-  {
-    id: "2",
-    name: "Sarah Johnson",
-    email: "sarah.johnson@example.com",
-    role: "franchise_manager",
-    status: "active",
-    lastActive: new Date(2024, 6, 14),
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah",
-  },
-  {
-    id: "3",
-    name: "Michael Chen",
-    email: "michael.chen@example.com",
-    role: "employee",
-    status: "active",
-    lastActive: new Date(2024, 6, 10),
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Michael",
-  },
-  {
-    id: "4",
-    name: "Jessica Williams",
-    email: "jessica.williams@example.com",
-    role: "employee",
-    status: "inactive",
-    lastActive: new Date(2024, 5, 25),
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Jessica",
-  },
-  {
-    id: "5",
-    name: "David Rodriguez",
-    email: "david.rodriguez@example.com",
-    role: "franchise_manager",
-    status: "active",
-    lastActive: new Date(2024, 6, 12),
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=David",
-  },
-  {
-    id: "6",
-    name: "Amanda Lee",
-    email: "amanda.lee@example.com",
-    role: "employee",
-    status: "pending",
-    lastActive: new Date(2024, 6, 16),
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Amanda",
-  },
-];
+const MOCK_USERS: User[] = [];
 
 export default function UserManagement() {
   const { toast } = useToast();
@@ -74,6 +21,7 @@ export default function UserManagement() {
   const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
   // Fetch users on component mount
   useEffect(() => {
@@ -106,9 +54,6 @@ export default function UserManagement() {
             `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.full_name}`,
         }));
         setUsers(mappedUsers);
-      } else {
-        // If no users in database, use mock data for development
-        setUsers(MOCK_USERS);
       }
     } catch (error) {
       console.error("Error fetching users:", error);
@@ -118,8 +63,8 @@ export default function UserManagement() {
           "No se pudieron cargar los usuarios. Usando datos de ejemplo.",
         variant: "destructive",
       });
-      // Fallback to mock data
-      setUsers(MOCK_USERS);
+      // Set empty array if error
+      setUsers([]);
     } finally {
       setIsLoading(false);
     }
@@ -386,19 +331,126 @@ export default function UserManagement() {
           onStatusFilterChange={setStatusFilter}
         />
 
-        <Button
-          onClick={() => {
-            setEditingUser(undefined);
-            setIsAddUserDialogOpen(true);
-          }}
-        >
-          <UserPlus className="mr-2 h-4 w-4" /> Add User
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="bg-muted rounded-md flex items-center p-1">
+            <Button
+              variant={viewMode === "grid" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => setViewMode("grid")}
+              aria-label="Vista de cuadrícula"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === "table" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => setViewMode("table")}
+              aria-label="Vista de tabla"
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
+          <Button
+            onClick={() => {
+              setEditingUser(undefined);
+              setIsAddUserDialogOpen(true);
+            }}
+          >
+            <UserPlus className="mr-2 h-4 w-4" /> Add User
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
         <div className="text-center py-12">
           <p className="text-muted-foreground">Cargando usuarios...</p>
+        </div>
+      ) : viewMode === "grid" ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+          {filteredUsers.map((user) => (
+            <div
+              key={user.id}
+              className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <Avatar className="h-12 w-12">
+                  <AvatarImage src={user.avatar} alt={user.name} />
+                  <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <h3 className="font-medium">{user.name}</h3>
+                  <p className="text-sm text-muted-foreground">{user.email}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">Role</p>
+                  <p className="text-sm">
+                    {user.role === "admin"
+                      ? "Administrator"
+                      : user.role === "franchise_manager"
+                        ? "Franchise Manager"
+                        : "Employee"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Status</p>
+                  <div className="flex items-center">
+                    <div
+                      className={`h-2 w-2 rounded-full mr-2 ${user.status === "active" ? "bg-green-500" : user.status === "pending" ? "bg-amber-500" : "bg-red-500"}`}
+                    ></div>
+                    <p className="text-sm capitalize">{user.status}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-between mt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleEditUser(user)}
+                >
+                  Edit
+                </Button>
+                {user.status === "active" ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDeactivateUser(user.id)}
+                  >
+                    Deactivate
+                  </Button>
+                ) : user.status === "inactive" ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleActivateUser(user.id)}
+                  >
+                    Activate
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleActivateUser(user.id)}
+                  >
+                    Approve
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-red-500"
+                  onClick={() => handleDeleteUser(user.id)}
+                >
+                  Delete
+                </Button>
+              </div>
+            </div>
+          ))}
         </div>
       ) : (
         <UserTable

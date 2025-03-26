@@ -6,10 +6,7 @@ import DashboardOverview from "../dashboard/DashboardOverview";
 const Dashboard = () => {
   return (
     <DashboardLayout activeItem="Dashboard">
-      <DashboardShell
-        title="Dashboard"
-        description="Overview of your franchise"
-      >
+      <DashboardShell title="" description="">
         <DashboardOverview />
       </DashboardShell>
     </DashboardLayout>

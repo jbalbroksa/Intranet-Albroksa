@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Filter, PlusCircle, Search } from "lucide-react";
+import { Filter, PlusCircle, Search, LayoutGrid, List } from "lucide-react";
 import NewsCard from "./NewsCard";
 import NewsEditor from "./NewsEditor";
 import NewsView from "./NewsView";
@@ -71,6 +71,7 @@ export default function NewsList() {
   const [isViewing, setIsViewing] = useState(false);
   const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
   // Fetch news and companies
   useEffect(() => {
@@ -642,9 +643,31 @@ export default function NewsList() {
     <div className="h-full flex flex-col">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold">Noticias</h1>
-        <Button onClick={handleCreateNews}>
-          <PlusCircle className="mr-2 h-4 w-4" /> Crear Noticia
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="bg-muted rounded-md flex items-center p-1">
+            <Button
+              variant={viewMode === "grid" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => setViewMode("grid")}
+              aria-label="Vista de cuadrícula"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === "table" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => setViewMode("table")}
+              aria-label="Vista de tabla"
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
+          <Button onClick={handleCreateNews}>
+            <PlusCircle className="mr-2 h-4 w-4" /> Crear Noticia
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col md:flex-row gap-4 mb-6">
@@ -707,7 +730,7 @@ export default function NewsList() {
                 filtros.
               </p>
             </div>
-          ) : (
+          ) : viewMode === "grid" ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredNews.map((newsItem) => (
                 <NewsCard
@@ -719,23 +742,195 @@ export default function NewsList() {
                 />
               ))}
             </div>
+          ) : (
+            <div className="rounded-md border">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-muted/50">
+                    <th className="p-2 text-left font-medium">Título</th>
+                    <th className="p-2 text-left font-medium">Categoría</th>
+                    <th className="p-2 text-left font-medium">Autor</th>
+                    <th className="p-2 text-left font-medium">Fecha</th>
+                    <th className="p-2 text-left font-medium">Compañía</th>
+                    <th className="p-2 text-center font-medium">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredNews.map((newsItem) => (
+                    <tr
+                      key={newsItem.id}
+                      className="border-t hover:bg-muted/50"
+                    >
+                      <td className="p-2">
+                        <div className="flex items-center gap-2">
+                          {newsItem.imageUrl && (
+                            <img
+                              src={newsItem.imageUrl}
+                              alt={newsItem.title}
+                              className="h-10 w-10 rounded-md object-cover"
+                            />
+                          )}
+                          <div>
+                            <div className="font-medium">{newsItem.title}</div>
+                            {newsItem.isPinned && (
+                              <div className="text-xs bg-amber-100 text-amber-800 rounded-full px-2 py-0.5 inline-block">
+                                Destacada
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-2">{newsItem.category}</td>
+                      <td className="p-2">
+                        <div className="flex items-center gap-2">
+                          <img
+                            src={newsItem.author.avatar}
+                            alt={newsItem.author.name}
+                            className="h-6 w-6 rounded-full"
+                          />
+                          <span>{newsItem.author.name}</span>
+                        </div>
+                      </td>
+                      <td className="p-2">
+                        {newsItem.publishedAt.toLocaleDateString()}
+                      </td>
+                      <td className="p-2">{newsItem.companyName || "-"}</td>
+                      <td className="p-2">
+                        <div className="flex justify-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleViewNews(newsItem.id)}
+                          >
+                            Ver
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditNews(newsItem.id)}
+                          >
+                            Editar
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteNews(newsItem.id)}
+                            className="text-red-500"
+                          >
+                            Eliminar
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </TabsContent>
 
         <TabsContent value="pinned">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredNews
-              .filter((newsItem) => newsItem.isPinned)
-              .map((newsItem) => (
-                <NewsCard
-                  key={newsItem.id}
-                  news={newsItem}
-                  onEdit={() => handleEditNews(newsItem.id)}
-                  onDelete={() => handleDeleteNews(newsItem.id)}
-                  onView={() => handleViewNews(newsItem.id)}
-                />
-              ))}
-          </div>
+          {viewMode === "grid" ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredNews
+                .filter((newsItem) => newsItem.isPinned)
+                .map((newsItem) => (
+                  <NewsCard
+                    key={newsItem.id}
+                    news={newsItem}
+                    onEdit={() => handleEditNews(newsItem.id)}
+                    onDelete={() => handleDeleteNews(newsItem.id)}
+                    onView={() => handleViewNews(newsItem.id)}
+                  />
+                ))}
+            </div>
+          ) : (
+            <div className="rounded-md border">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-muted/50">
+                    <th className="p-2 text-left font-medium">Título</th>
+                    <th className="p-2 text-left font-medium">Categoría</th>
+                    <th className="p-2 text-left font-medium">Autor</th>
+                    <th className="p-2 text-left font-medium">Fecha</th>
+                    <th className="p-2 text-left font-medium">Compañía</th>
+                    <th className="p-2 text-center font-medium">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredNews
+                    .filter((newsItem) => newsItem.isPinned)
+                    .map((newsItem) => (
+                      <tr
+                        key={newsItem.id}
+                        className="border-t hover:bg-muted/50"
+                      >
+                        <td className="p-2">
+                          <div className="flex items-center gap-2">
+                            {newsItem.imageUrl && (
+                              <img
+                                src={newsItem.imageUrl}
+                                alt={newsItem.title}
+                                className="h-10 w-10 rounded-md object-cover"
+                              />
+                            )}
+                            <div>
+                              <div className="font-medium">
+                                {newsItem.title}
+                              </div>
+                              <div className="text-xs bg-amber-100 text-amber-800 rounded-full px-2 py-0.5 inline-block">
+                                Destacada
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-2">{newsItem.category}</td>
+                        <td className="p-2">
+                          <div className="flex items-center gap-2">
+                            <img
+                              src={newsItem.author.avatar}
+                              alt={newsItem.author.name}
+                              className="h-6 w-6 rounded-full"
+                            />
+                            <span>{newsItem.author.name}</span>
+                          </div>
+                        </td>
+                        <td className="p-2">
+                          {newsItem.publishedAt.toLocaleDateString()}
+                        </td>
+                        <td className="p-2">{newsItem.companyName || "-"}</td>
+                        <td className="p-2">
+                          <div className="flex justify-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleViewNews(newsItem.id)}
+                            >
+                              Ver
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditNews(newsItem.id)}
+                            >
+                              Editar
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteNews(newsItem.id)}
+                              className="text-red-500"
+                            >
+                              Eliminar
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>

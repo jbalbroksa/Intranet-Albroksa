@@ -271,22 +271,36 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          level: number | null
           name: string
           parent_category: string
+          parent_subcategory: string | null
         }
         Insert: {
           created_at?: string
           id?: string
+          level?: number | null
           name: string
           parent_category: string
+          parent_subcategory?: string | null
         }
         Update: {
           created_at?: string
           id?: string
+          level?: number | null
           name?: string
           parent_category?: string
+          parent_subcategory?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "content_subcategories_parent_subcategory_fkey"
+            columns: ["parent_subcategory"]
+            isOneToOne: false
+            referencedRelation: "content_subcategories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       content_tags: {
         Row: {
@@ -679,6 +693,30 @@ export type Database = {
           id?: string
           module?: string
           role?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      specification_subcategories: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+          parent_category: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+          parent_category: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+          parent_category?: string
           updated_at?: string | null
         }
         Relationships: []

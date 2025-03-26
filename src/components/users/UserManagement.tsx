@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Filter, PlusCircle, Search } from "lucide-react";
+import { Filter, PlusCircle, Search, LayoutGrid, List } from "lucide-react";
 import UserCard from "./UserCard";
 import UserEditor from "./UserEditor";
 import { supabase } from "@/lib/supabase";
@@ -51,6 +51,7 @@ function UserManagement() {
   const [isEditing, setIsEditing] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
   // Fetch users and branches
   useEffect(() => {
@@ -292,9 +293,31 @@ function UserManagement() {
     <div className="h-full flex flex-col">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold">Gestión de Usuarios</h1>
-        <Button onClick={handleCreateUser}>
-          <PlusCircle className="mr-2 h-4 w-4" /> Crear Usuario
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="bg-muted rounded-md flex items-center p-1">
+            <Button
+              variant={viewMode === "grid" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => setViewMode("grid")}
+              aria-label="Vista de cuadrícula"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === "table" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => setViewMode("table")}
+              aria-label="Vista de tabla"
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
+          <Button onClick={handleCreateUser}>
+            <PlusCircle className="mr-2 h-4 w-4" /> Crear Usuario
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col md:flex-row gap-4 mb-6">
@@ -360,7 +383,7 @@ function UserManagement() {
             No se encontraron usuarios. Intente ajustar su búsqueda o filtros.
           </p>
         </div>
-      ) : (
+      ) : viewMode === "grid" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredUsers.map((user) => (
             <UserCard
@@ -370,6 +393,68 @@ function UserManagement() {
               onDelete={() => handleDeleteUser(user.id)}
             />
           ))}
+        </div>
+      ) : (
+        <div className="rounded-md border">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-muted/50">
+                <th className="p-2 text-left font-medium">Usuario</th>
+                <th className="p-2 text-left font-medium">Email</th>
+                <th className="p-2 text-left font-medium">Tipo</th>
+                <th className="p-2 text-left font-medium">Sucursal</th>
+                <th className="p-2 text-center font-medium">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredUsers.map((user) => (
+                <tr key={user.id} className="border-t hover:bg-muted/50">
+                  <td className="p-2">
+                    <div className="flex items-center gap-2">
+                      <img
+                        src={
+                          user.avatarUrl ||
+                          `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`
+                        }
+                        alt={user.fullName}
+                        className="h-8 w-8 rounded-full"
+                      />
+                      <div>
+                        <div className="font-medium">{user.fullName}</div>
+                        {user.isAdmin && (
+                          <div className="text-xs bg-blue-100 text-blue-800 rounded-full px-2 py-0.5 inline-block">
+                            Admin
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="p-2">{user.email}</td>
+                  <td className="p-2">{user.userType}</td>
+                  <td className="p-2">{user.branch || "-"}</td>
+                  <td className="p-2">
+                    <div className="flex justify-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEditUser(user.id)}
+                      >
+                        Editar
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteUser(user.id)}
+                        className="text-red-500"
+                      >
+                        Eliminar
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

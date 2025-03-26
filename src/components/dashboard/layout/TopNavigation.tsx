@@ -19,11 +19,15 @@ export default function TopNavigation() {
   const { theme, setTheme } = useTheme();
 
   return (
-    <header className="fixed top-0 left-0 right-0 h-16 border-b bg-background/95 backdrop-blur z-50 flex items-center px-4 md:px-6">
+    <header className="fixed top-0 left-0 right-0 h-16 border-b bg-[#1E2836] text-white z-50 flex items-center px-4 md:px-6">
       <div className="flex items-center w-full justify-between">
         <div className="flex items-center">
           <Link to="/dashboard" className="flex items-center">
-            <span className="text-xl font-bold">ConectaSeguros</span>
+            <img
+              src="https://albroksa.com/wp-content/uploads/2022/11/logo_albrok_blanco_transp.png"
+              alt="Albrok"
+              width="200"
+            />
           </Link>
         </div>
 
@@ -33,6 +37,7 @@ export default function TopNavigation() {
             size="icon"
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             aria-label="Toggle theme"
+            className="text-white hover:text-white/80"
           >
             {theme === "dark" ? (
               <Sun className="h-5 w-5" />
@@ -41,7 +46,12 @@ export default function TopNavigation() {
             )}
           </Button>
 
-          <Button variant="ghost" size="icon" aria-label="Notifications">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Notifications"
+            className="text-white hover:text-white/80"
+          >
             <Bell className="h-5 w-5" />
           </Button>
 
@@ -50,7 +60,7 @@ export default function TopNavigation() {
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
-                  className="relative h-8 w-8 rounded-full"
+                  className="relative h-8 w-8 rounded-full text-white hover:text-white/80"
                 >
                   <Avatar className="h-8 w-8">
                     <AvatarImage
