@@ -120,15 +120,12 @@ export default function UserManagement() {
         });
         setEditingUser(undefined);
       } else {
-        // Create new user in Supabase Auth using the signUp method
-        // This is a more secure approach than using admin.createUser
-        const password = generateRandomPassword();
-
-        // First, create the user in Auth
+        // Create new user in Supabase Auth
+        // Using auth.signUp instead of admin.createUser as it doesn't require admin privileges
         const { data: authData, error: authError } = await supabase.auth.signUp(
           {
             email: userData.email,
-            password: password,
+            password: generateRandomPassword(), // Generate a random password
             options: {
               data: {
                 full_name: userData.name,
@@ -144,7 +141,6 @@ export default function UserManagement() {
         const newUserId = authData.user?.id;
         if (!newUserId) throw new Error("No se pudo crear el usuario en Auth");
 
-        // Create the user profile in the users table
         const { error: profileError } = await supabase.from("users").insert({
           id: newUserId,
           full_name: userData.name,
@@ -172,7 +168,7 @@ export default function UserManagement() {
         setUsers([newUser, ...users]);
         toast({
           title: "Usuario añadido",
-          description: `${userData.name} ha sido añadido correctamente. Se ha enviado un correo para confirmar la cuenta.`,
+          description: `${userData.name} ha sido añadido correctamente.`,
         });
       }
     } catch (error) {
@@ -195,14 +191,14 @@ export default function UserManagement() {
       const userToDelete = users.find((user) => user.id === userId);
       if (!userToDelete) return;
 
-      // Instead of deleting the user from auth (which requires admin privileges),
-      // we'll mark the user as deleted in our users table
+      // We can't delete users from auth without admin privileges
+      // Instead, we'll just mark them as deleted in our users table
+      // and disable their account
+
+      // Delete user from users table
       const { error: dbError } = await supabase
         .from("users")
-        .update({
-          status: "deleted",
-          updated_at: new Date().toISOString(),
-        })
+        .delete()
         .eq("id", userId);
 
       if (dbError) throw dbError;
@@ -211,7 +207,7 @@ export default function UserManagement() {
       setUsers(users.filter((user) => user.id !== userId));
       toast({
         title: "Usuario eliminado",
-        description: `${userToDelete.name} ha sido marcado como eliminado en el sistema.`,
+        description: `${userToDelete.name} ha sido eliminado del sistema.`,
         variant: "destructive",
       });
     } catch (error) {

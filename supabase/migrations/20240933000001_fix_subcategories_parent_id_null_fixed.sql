@@ -4,9 +4,9 @@
 -- Update records where parent_subcategory is NULL or empty string
 UPDATE content_subcategories
 SET parent_subcategory = NULL
-WHERE parent_subcategory IS NULL OR parent_subcategory::text = '';
+WHERE parent_subcategory IS NULL OR parent_subcategory = '';
 
 -- Update records where parent_id is NULL or empty string
 UPDATE content_subcategories
 SET parent_id = NULL
-WHERE parent_id IS NULL OR parent_id::text = '';
+WHERE parent_id IS NULL OR parent_id = '';

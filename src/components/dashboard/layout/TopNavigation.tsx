@@ -137,7 +137,7 @@ export default function TopNavigation() {
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 h-16 border-b bg-corporate-header text-white z-50 flex items-center px-4 md:px-6">
+    <header className="fixed top-0 left-0 right-0 h-16 border-b bg-background text-foreground z-50 flex items-center px-4 md:px-6">
       <div className="flex items-center w-full justify-between">
         <div className="flex items-center">
           <Link to="/dashboard" className="flex items-center">
@@ -155,7 +155,7 @@ export default function TopNavigation() {
             size="icon"
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             aria-label="Toggle theme"
-            className="text-white hover:text-white/80"
+            className="text-foreground hover:text-foreground/80"
           >
             {theme === "dark" ? (
               <Sun className="h-5 w-5" />
@@ -173,7 +173,7 @@ export default function TopNavigation() {
                 variant="ghost"
                 size="icon"
                 aria-label="Notifications"
-                className="text-white hover:text-white/80 relative"
+                className="text-foreground hover:text-foreground/80 relative"
               >
                 <Bell className="h-5 w-5" />
                 {unreadCount > 0 && (
@@ -250,7 +250,7 @@ export default function TopNavigation() {
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
-                  className="relative h-8 w-8 rounded-full text-white hover:text-white/80"
+                  className="relative h-8 w-8 rounded-full text-foreground hover:text-foreground/80"
                 >
                   <Avatar className="h-8 w-8">
                     <AvatarImage
