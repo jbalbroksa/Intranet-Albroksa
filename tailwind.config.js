@@ -54,6 +54,7 @@ module.exports = {
         corporate: {
           primary: "#FF0000",
           secondary: "#1E2836",
+          header: "#020817",
         },
       },
       borderRadius: {

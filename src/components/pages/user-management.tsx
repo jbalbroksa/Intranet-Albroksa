@@ -1,13 +1,12 @@
-import UserManagement from "../users/UserManagement";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DashboardLayout from "../dashboard/layout/DashboardLayout";
 import BranchManagement from "../branches/BranchManagement";
 import { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
+import UserManagementComponent from "../dashboard/UserManagement";
 
 export default function UserManagementPage() {
   const location = useLocation();
-  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("users");
 
   // Handle direct navigation to /user-management by setting default tab
@@ -24,7 +23,7 @@ export default function UserManagementPage() {
       // Update URL hash without triggering a navigation
       window.history.replaceState(null, "", `/user-management#users`);
     }
-  }, [location]); // Removed navigate from dependencies to avoid redirect loops
+  }, [location.hash, location.pathname]); // Only depend on hash and pathname
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);
@@ -44,7 +43,7 @@ export default function UserManagementPage() {
           <TabsTrigger value="branches">Sucursales</TabsTrigger>
         </TabsList>
         <TabsContent value="users">
-          <UserManagement />
+          <UserManagementComponent />
         </TabsContent>
         <TabsContent value="branches">
           <BranchManagement />
