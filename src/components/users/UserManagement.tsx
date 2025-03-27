@@ -40,7 +40,7 @@ export const USER_TYPES = [
   "Administrador",
 ];
 
-function UserManagement() {
+const UserManagement = () => {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedRole, setSelectedRole] = useState("Todos los roles");
@@ -216,12 +216,61 @@ function UserManagement() {
           description: "El usuario ha sido actualizado correctamente",
         });
       } else {
+        // Check if email already exists
+        const { data: existingUsers, error: checkError } = await supabase
+          .from("users")
+          .select("id")
+          .eq("email", userData.email);
+
+        if (checkError) throw checkError;
+
+        if (existingUsers && existingUsers.length > 0) {
+          toast({
+            title: "Error",
+            description: "Ya existe un usuario con este correo electrónico",
+            variant: "destructive",
+          });
+          return;
+        }
+
         // Create new user
         const userId = userData.id || crypto.randomUUID();
+
+        // First create auth user
+        const { data: authData, error: authError } =
+          await supabase.auth.admin.createUser({
+            email: userData.email,
+            email_confirm: true,
+            user_metadata: {
+              full_name: userData.fullName,
+            },
+            app_metadata: {
+              role: userData.isAdmin ? "admin" : "user",
+            },
+          });
+
+        if (authError) {
+          if (authError.message.includes("already exists")) {
+            toast({
+              title: "Error",
+              description: "Ya existe un usuario con este correo electrónico",
+              variant: "destructive",
+            });
+          } else {
+            toast({
+              title: "Error",
+              description: `Error al crear el usuario: ${authError.message}`,
+              variant: "destructive",
+            });
+          }
+          return;
+        }
+
+        // Then create profile in public.users table
         const { data, error } = await supabase
           .from("users")
           .insert({
-            id: userId,
+            id: authData.user.id, // Use the ID from auth
             full_name: userData.fullName,
             email: userData.email,
             avatar_url: userData.avatarUrl || null,
@@ -238,11 +287,16 @@ function UserManagement() {
           .select()
           .single();
 
-        if (error) throw error;
+        if (error) {
+          // If there was an error creating the profile, try to delete the auth user
+          await supabase.auth.admin.deleteUser(authData.user.id);
+          throw error;
+        }
 
         toast({
           title: "Usuario creado",
-          description: "El usuario ha sido creado correctamente",
+          description:
+            "El usuario ha sido creado correctamente. Se ha enviado un correo para establecer la contraseña.",
         });
       }
 
@@ -250,11 +304,12 @@ function UserManagement() {
       fetchUsers();
       setIsEditing(false);
       setSelectedUser(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving user:", error);
+      const errorMessage = error.message || "No se pudo guardar el usuario";
       toast({
         title: "Error",
-        description: "No se pudo guardar el usuario",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -459,6 +514,6 @@ function UserManagement() {
       )}
     </div>
   );
-}
+};
 
 export default UserManagement;

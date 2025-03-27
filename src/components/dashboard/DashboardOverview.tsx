@@ -7,6 +7,8 @@ import {
 } from "@/components/ui/card";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { FileText, Users, BookOpen, Calendar, Activity } from "lucide-react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 import AlertsSection from "./AlertsSection";
 import RecentDocuments from "./RecentDocuments";
 import FeaturedNews from "../news/FeaturedNews";
@@ -14,39 +16,160 @@ import RecentNews from "../news/RecentNews";
 
 export default function DashboardOverview() {
   const { profile } = useUserProfile();
+  const [userCount, setUserCount] = useState(0);
+  const [documentCount, setDocumentCount] = useState(0);
+  const [companyCount, setCompanyCount] = useState(0);
+  const [eventCount, setEventCount] = useState(0);
+
+  useEffect(() => {
+    // Fetch initial counts
+    fetchCounts();
+
+    // Set up real-time subscriptions
+    const usersSubscription = supabase
+      .channel("users-changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "users" },
+        () => {
+          fetchUserCount();
+        },
+      )
+      .subscribe();
+
+    const documentsSubscription = supabase
+      .channel("documents-changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "documents" },
+        () => {
+          fetchDocumentCount();
+        },
+      )
+      .subscribe();
+
+    const companiesSubscription = supabase
+      .channel("companies-changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "companies" },
+        () => {
+          fetchCompanyCount();
+        },
+      )
+      .subscribe();
+
+    const eventsSubscription = supabase
+      .channel("events-changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "calendar_events" },
+        () => {
+          fetchEventCount();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      usersSubscription.unsubscribe();
+      documentsSubscription.unsubscribe();
+      companiesSubscription.unsubscribe();
+      eventsSubscription.unsubscribe();
+    };
+  }, []);
+
+  const fetchCounts = async () => {
+    fetchUserCount();
+    fetchDocumentCount();
+    fetchCompanyCount();
+    fetchEventCount();
+  };
+
+  const fetchUserCount = async () => {
+    try {
+      const { count, error } = await supabase
+        .from("users")
+        .select("*", { count: "exact", head: true });
+
+      if (error) throw error;
+      setUserCount(count || 0);
+    } catch (error) {
+      console.error("Error fetching user count:", error);
+    }
+  };
+
+  const fetchDocumentCount = async () => {
+    try {
+      const { count, error } = await supabase
+        .from("documents")
+        .select("*", { count: "exact", head: true });
+
+      if (error) throw error;
+      setDocumentCount(count || 0);
+    } catch (error) {
+      console.error("Error fetching document count:", error);
+    }
+  };
+
+  const fetchCompanyCount = async () => {
+    try {
+      const { count, error } = await supabase
+        .from("companies")
+        .select("*", { count: "exact", head: true });
+
+      if (error) throw error;
+      setCompanyCount(count || 0);
+    } catch (error) {
+      console.error("Error fetching company count:", error);
+    }
+  };
+
+  const fetchEventCount = async () => {
+    try {
+      const { count, error } = await supabase
+        .from("calendar_events")
+        .select("*", { count: "exact", head: true });
+
+      if (error) throw error;
+      setEventCount(count || 0);
+    } catch (error) {
+      console.error("Error fetching event count:", error);
+    }
+  };
 
   const stats = [
     {
       title: "Documentos",
-      value: "0",
+      value: documentCount.toString(),
       description: "Total documentos",
       icon: <FileText className="h-5 w-5 text-corporate-primary" />,
-      change: "Sin cambios",
-      trend: "neutral",
+      change:
+        documentCount > 0 ? `${documentCount} documentos` : "Sin documentos",
+      trend: documentCount > 0 ? "up" : "neutral",
     },
     {
       title: "Usuarios",
-      value: "0",
+      value: userCount.toString(),
       description: "Usuarios activos",
       icon: <Users className="h-5 w-5 text-corporate-primary" />,
-      change: "Sin cambios",
-      trend: "neutral",
+      change: userCount > 0 ? `${userCount} usuarios` : "Sin usuarios",
+      trend: userCount > 0 ? "up" : "neutral",
     },
     {
       title: "Compañías",
-      value: "0",
+      value: companyCount.toString(),
       description: "Compañías de seguros",
       icon: <BookOpen className="h-5 w-5 text-corporate-primary" />,
-      change: "Sin cambios",
-      trend: "neutral",
+      change: companyCount > 0 ? `${companyCount} compañías` : "Sin compañías",
+      trend: companyCount > 0 ? "up" : "neutral",
     },
     {
       title: "Eventos",
-      value: "0",
+      value: eventCount.toString(),
       description: "Próximos eventos",
       icon: <Calendar className="h-5 w-5 text-corporate-primary" />,
-      change: "Sin eventos",
-      trend: "neutral",
+      change: eventCount > 0 ? `${eventCount} eventos` : "Sin eventos",
+      trend: eventCount > 0 ? "up" : "neutral",
     },
   ];
 

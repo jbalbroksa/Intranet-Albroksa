@@ -1,6 +1,11 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 
+// Export the supabase client directly
+export function useSupabase() {
+  return { supabase };
+}
+
 // Generic hook for fetching data from Supabase
 export function useSupabaseQuery<T>(
   query: () => Promise<T>,

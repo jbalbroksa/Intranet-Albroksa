@@ -36,8 +36,17 @@ export default function CompanyCard({
   onDelete,
   onViewSpecifications,
 }: CompanyCardProps) {
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Prevent default to avoid triggering when clicking action buttons
+    e.stopPropagation();
+    // Navigate to company view
+    onViewSpecifications();
+  };
   return (
-    <Card className="overflow-hidden hover:shadow-sm transition-shadow">
+    <Card
+      className="overflow-hidden hover:shadow-sm transition-shadow cursor-pointer"
+      onClick={handleCardClick}
+    >
       <CardHeader className="pb-2">
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-4">

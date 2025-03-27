@@ -35,11 +35,7 @@ function AppRoutes() {
   // For Tempo routes
   // Use { useMatch: () => false } to prevent route matching errors with hash URLs
   const tempoRoutes =
-    import.meta.env.VITE_TEMPO === "true"
-      ? useRoutes(routes, {
-          useMatch: (path) => (path.includes("#") ? false : undefined),
-        })
-      : null;
+    import.meta.env.VITE_TEMPO === "true" ? useRoutes(routes) : null;
 
   return (
     <>

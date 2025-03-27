@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,9 +25,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PlusCircle, Trash, Edit } from "lucide-react";
+import {
+  PlusCircle,
+  Trash,
+  Edit,
+  ChevronDown,
+  ChevronRight,
+} from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/ui/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const MAIN_CATEGORIES = [
   "Seguro para particulares",
@@ -40,7 +56,8 @@ interface Subcategory {
   id: string;
   name: string;
   parent_category: string;
-  parent_subcategory?: string;
+  parent_id?: string | null;
+  parent_subcategory?: string | null;
   created_at: string;
   level: number;
 }
@@ -54,10 +71,18 @@ export default function CategoryManager() {
   const [selectedParentCategory, setSelectedParentCategory] = useState(
     MAIN_CATEGORIES[0],
   );
+  const [selectedParentId, setSelectedParentId] = useState<string | null>(null);
   const [editingSubcategory, setEditingSubcategory] =
     useState<Subcategory | null>(null);
   const [isAddingSubSubcategory, setIsAddingSubSubcategory] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [expandedCategories, setExpandedCategories] = useState<
+    Record<string, boolean>
+  >({});
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [subcategoryToDelete, setSubcategoryToDelete] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     fetchSubcategories();
@@ -103,16 +128,48 @@ export default function CategoryManager() {
       const isAddingToSubcategory =
         editingSubcategory && isAddingSubSubcategory;
 
+      // Calculate level based on parent
+      let level = 1; // Default level for top-level subcategories
+      let parentId = null;
+
+      if (isAddingToSubcategory && editingSubcategory) {
+        // Adding a sub-subcategory
+        level = editingSubcategory.level + 1;
+        parentId = editingSubcategory.id;
+      } else if (selectedParentId) {
+        // Adding to a selected parent
+        const parentSubcat = subcategories.find(
+          (s) => s.id === selectedParentId,
+        );
+        if (parentSubcat) {
+          level = parentSubcat.level + 1;
+          parentId = parentSubcat.id;
+        }
+      }
+
+      // Get sibling subcategories (no display order needed)
+      const siblingSubcats = subcategories.filter(
+        (s) =>
+          s.parent_category === selectedParentCategory &&
+          s.parent_id === parentId,
+      );
+
       // Format the subcategory name appropriately
       let fullName = "";
-      let parentSubcategoryId = null;
-      let level = 1; // Default level for direct subcategories of main categories
 
       if (isAddingToSubcategory && editingSubcategory) {
         // Adding a sub-subcategory
         fullName = `${editingSubcategory.name}/${newSubcategoryName.trim()}`;
-        parentSubcategoryId = editingSubcategory.id;
-        level = editingSubcategory.level + 1;
+      } else if (selectedParentId) {
+        // Adding to a selected parent
+        const parentSubcat = subcategories.find(
+          (s) => s.id === selectedParentId,
+        );
+        if (parentSubcat) {
+          fullName = `${parentSubcat.name}/${newSubcategoryName.trim()}`;
+        } else {
+          fullName = `${selectedParentCategory}/${newSubcategoryName.trim()}`;
+        }
       } else {
         // Adding a regular subcategory to a main category
         fullName = `${selectedParentCategory}/${newSubcategoryName.trim()}`;
@@ -123,7 +180,8 @@ export default function CategoryManager() {
         .insert({
           name: fullName,
           parent_category: selectedParentCategory,
-          parent_subcategory: parentSubcategoryId,
+          parent_id: parentId,
+          parent_subcategory: parentId || null, // For backward compatibility, ensure null if parentId is null
           level: level,
         })
         .select()
@@ -136,6 +194,15 @@ export default function CategoryManager() {
       setIsAddDialogOpen(false);
       setIsAddingSubSubcategory(false);
       setEditingSubcategory(null);
+      setSelectedParentId(null);
+
+      // Expand the parent category if adding a subcategory
+      if (parentId) {
+        setExpandedCategories({
+          ...expandedCategories,
+          [parentId]: true,
+        });
+      }
 
       toast({
         title: "Subcategoría añadida",
@@ -155,14 +222,39 @@ export default function CategoryManager() {
     if (!editingSubcategory || !newSubcategoryName.trim()) return;
 
     try {
-      // Format the subcategory name as "parent/name"
-      const fullName = `${selectedParentCategory}/${newSubcategoryName.trim()}`;
+      // Calculate level based on parent
+      let level = 1; // Default level for top-level subcategories
+      let parentId = selectedParentId;
+
+      if (parentId) {
+        const parentSubcat = subcategories.find((s) => s.id === parentId);
+        if (parentSubcat) {
+          level = parentSubcat.level + 1;
+        }
+      }
+
+      // Format the subcategory name appropriately
+      let fullName = "";
+
+      if (parentId) {
+        const parentSubcat = subcategories.find((s) => s.id === parentId);
+        if (parentSubcat) {
+          fullName = `${parentSubcat.name}/${newSubcategoryName.trim()}`;
+        } else {
+          fullName = `${selectedParentCategory}/${newSubcategoryName.trim()}`;
+        }
+      } else {
+        fullName = `${selectedParentCategory}/${newSubcategoryName.trim()}`;
+      }
 
       const { data, error } = await supabase
         .from("content_subcategories")
         .update({
           name: fullName,
           parent_category: selectedParentCategory,
+          parent_id: parentId,
+          parent_subcategory: parentId, // For backward compatibility
+          level: level,
         })
         .eq("id", editingSubcategory.id)
         .select()
@@ -177,6 +269,7 @@ export default function CategoryManager() {
       );
       setNewSubcategoryName("");
       setEditingSubcategory(null);
+      setSelectedParentId(null);
       setIsEditDialogOpen(false);
 
       toast({
@@ -193,16 +286,44 @@ export default function CategoryManager() {
     }
   };
 
-  const handleDeleteSubcategory = async (id: string) => {
+  const handleDeleteSubcategory = (id: string) => {
+    setSubcategoryToDelete(id);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteSubcategory = async () => {
+    if (!subcategoryToDelete) return;
+
     try {
+      // First check if this subcategory has children
+      const { data: childrenData, error: childrenError } = await supabase
+        .from("content_subcategories")
+        .select("id")
+        .eq("parent_id", subcategoryToDelete);
+
+      if (childrenError) throw childrenError;
+
+      if (childrenData && childrenData.length > 0) {
+        toast({
+          title: "Error",
+          description:
+            "No se puede eliminar una subcategoría que tiene subcategorías hijas. Elimine primero las subcategorías hijas.",
+          variant: "destructive",
+        });
+        setIsDeleteDialogOpen(false);
+        setSubcategoryToDelete(null);
+        return;
+      }
+
       const { error } = await supabase
         .from("content_subcategories")
         .delete()
-        .eq("id", id);
+        .eq("id", subcategoryToDelete);
 
       if (error) throw error;
 
-      setSubcategories(subcategories.filter((subcat) => subcat.id !== id));
+      // Refresh subcategories instead of just filtering state
+      await fetchSubcategories();
 
       toast({
         title: "Subcategoría eliminada",
@@ -215,25 +336,174 @@ export default function CategoryManager() {
         description: "No se pudo eliminar la subcategoría",
         variant: "destructive",
       });
+    } finally {
+      setIsDeleteDialogOpen(false);
+      setSubcategoryToDelete(null);
     }
   };
 
   const openEditDialog = (subcategory: Subcategory) => {
     setEditingSubcategory(subcategory);
     setSelectedParentCategory(subcategory.parent_category);
+    setSelectedParentId(subcategory.parent_id || null);
+
     // Extract just the name part from the full name (parent/name)
     const nameParts = subcategory.name.split("/");
     setNewSubcategoryName(
-      nameParts.length > 1 ? nameParts[1] : subcategory.name,
+      nameParts.length > 0 ? nameParts[nameParts.length - 1] : subcategory.name,
     );
+
     setIsEditDialogOpen(true);
+  };
+
+  const toggleExpand = (id: string) => {
+    setExpandedCategories({
+      ...expandedCategories,
+      [id]: !expandedCategories[id],
+    });
+  };
+
+  // Organize subcategories into a hierarchical structure
+  const organizeSubcategories = () => {
+    // First, group by parent category
+    const categorized: Record<string, Subcategory[]> = {};
+
+    MAIN_CATEGORIES.forEach((category) => {
+      // Get only top-level subcategories for this category (those without a parent_id)
+      categorized[category] = subcategories.filter(
+        (subcat) => subcat.parent_category === category && !subcat.parent_id,
+      );
+
+      // Sort by name for consistent display
+      categorized[category].sort((a, b) => {
+        const aName = a.name.split("/").pop() || a.name;
+        const bName = b.name.split("/").pop() || b.name;
+        return aName.localeCompare(bName);
+      });
+    });
+
+    return categorized;
+  };
+
+  // Get child subcategories for a given parent
+  const getChildSubcategories = (parentId: string) => {
+    const children = subcategories.filter(
+      (subcat) => subcat.parent_id === parentId,
+    );
+
+    // Sort children by name for consistent display
+    return children.sort((a, b) => {
+      const aName = a.name.split("/").pop() || a.name;
+      const bName = b.name.split("/").pop() || b.name;
+      return aName.localeCompare(bName);
+    });
+  };
+
+  const renderSubcategory = (subcategory: Subcategory, depth: number = 0) => {
+    const children = getChildSubcategories(subcategory.id);
+    const hasChildren = children.length > 0;
+    const isExpanded = expandedCategories[subcategory.id];
+    const nameParts = subcategory.name.split("/");
+    const displayName = nameParts[nameParts.length - 1];
+
+    return (
+      <React.Fragment key={subcategory.id}>
+        <TableRow>
+          <TableCell>
+            <div
+              className="flex items-center"
+              style={{ paddingLeft: `${depth * 20}px` }}
+            >
+              {hasChildren ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 p-0 mr-1"
+                  onClick={() => toggleExpand(subcategory.id)}
+                >
+                  {isExpanded ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </Button>
+              ) : (
+                <div className="w-7"></div>
+              )}
+              {displayName}
+            </div>
+          </TableCell>
+          <TableCell>{subcategory.parent_category}</TableCell>
+          <TableCell className="text-right">
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  setIsAddDialogOpen(true);
+                  setEditingSubcategory(subcategory);
+                  setIsAddingSubSubcategory(true);
+                  setSelectedParentCategory(subcategory.parent_category);
+                  setSelectedParentId(subcategory.id);
+                  setNewSubcategoryName("");
+                }}
+                title="Añadir subcategoría"
+              >
+                <PlusCircle className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => openEditDialog(subcategory)}
+                title="Editar"
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => handleDeleteSubcategory(subcategory.id)}
+                className="text-red-500 hover:text-red-700"
+                title="Eliminar"
+              >
+                <Trash className="h-4 w-4" />
+              </Button>
+            </div>
+          </TableCell>
+        </TableRow>
+
+        {/* Render children if expanded */}
+        {isExpanded &&
+          hasChildren &&
+          children.map((child) => renderSubcategory(child, depth + 1))}
+      </React.Fragment>
+    );
+  };
+
+  const categorizedSubcategories = organizeSubcategories();
+
+  // Get available parent subcategories for the selected category
+  const getAvailableParentSubcategories = () => {
+    return subcategories.filter(
+      (s) =>
+        s.parent_category === selectedParentCategory &&
+        (!editingSubcategory || s.id !== editingSubcategory.id), // Can't select self as parent
+    );
   };
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Gestión de Categorías</h2>
-        <Button onClick={() => setIsAddDialogOpen(true)}>
+        <Button
+          onClick={() => {
+            setIsAddDialogOpen(true);
+            setIsAddingSubSubcategory(false);
+            setEditingSubcategory(null);
+            setSelectedParentId(null);
+            setNewSubcategoryName("");
+          }}
+        >
           <PlusCircle className="mr-2 h-4 w-4" /> Añadir Subcategoría
         </Button>
       </div>
@@ -277,91 +547,13 @@ export default function CategoryManager() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {subcategories.map((subcategory) => {
-                    const nameParts = subcategory.name.split("/");
-                    const displayName = nameParts[nameParts.length - 1];
-                    const indentClass =
-                      subcategory.level > 1
-                        ? `pl-${Math.min(subcategory.level * 4, 12)}`
-                        : "";
-                    const parentSubcategory = subcategory.parent_subcategory
-                      ? subcategories.find(
-                          (s) => s.id === subcategory.parent_subcategory,
-                        )
-                      : null;
-                    const parentName = parentSubcategory
-                      ? parentSubcategory.name.split("/").pop()
-                      : null;
-
-                    return (
-                      <TableRow key={subcategory.id}>
-                        <TableCell>
-                          <div className={`flex items-center ${indentClass}`}>
-                            {subcategory.level > 1 && (
-                              <span className="text-muted-foreground text-xs mr-2">
-                                ↳
-                              </span>
-                            )}
-                            {displayName}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {subcategory.level > 1 && parentName ? (
-                            <div className="flex items-center">
-                              <span>{subcategory.parent_category}</span>
-                              <span className="mx-1 text-muted-foreground">
-                                →
-                              </span>
-                              <span className="text-muted-foreground">
-                                {parentName}
-                              </span>
-                            </div>
-                          ) : (
-                            subcategory.parent_category
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => {
-                                setIsAddDialogOpen(true);
-                                setEditingSubcategory(subcategory);
-                                setIsAddingSubSubcategory(true);
-                                setSelectedParentCategory(
-                                  subcategory.parent_category,
-                                );
-                                setNewSubcategoryName("");
-                              }}
-                              title="Añadir subcategoría"
-                            >
-                              <PlusCircle className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => openEditDialog(subcategory)}
-                              title="Editar"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() =>
-                                handleDeleteSubcategory(subcategory.id)
-                              }
-                              className="text-red-500 hover:text-red-700"
-                              title="Eliminar"
-                            >
-                              <Trash className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
+                  {MAIN_CATEGORIES.map((category) => (
+                    <React.Fragment key={category}>
+                      {categorizedSubcategories[category]?.map((subcategory) =>
+                        renderSubcategory(subcategory),
+                      )}
+                    </React.Fragment>
+                  ))}
                 </TableBody>
               </Table>
             </div>
@@ -377,6 +569,7 @@ export default function CategoryManager() {
           if (!open) {
             setIsAddingSubSubcategory(false);
             setEditingSubcategory(null);
+            setSelectedParentId(null);
           }
         }}
       >
@@ -422,6 +615,33 @@ export default function CategoryManager() {
                 </div>
               </div>
             )}
+            {!isAddingSubSubcategory && (
+              <div className="space-y-2">
+                <Label htmlFor="parentSubcategory">
+                  Subcategoría Padre (opcional)
+                </Label>
+                <Select
+                  value={selectedParentId || ""}
+                  onValueChange={(value) => setSelectedParentId(value || null)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccione una subcategoría padre (opcional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Ninguna (nivel superior)</SelectItem>
+                    {getAvailableParentSubcategories().map((subcat) => {
+                      const nameParts = subcat.name.split("/");
+                      const displayName = nameParts[nameParts.length - 1];
+                      return (
+                        <SelectItem key={subcat.id} value={subcat.id}>
+                          {displayName}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             {isAddingSubSubcategory && editingSubcategory && (
               <div className="space-y-2">
                 <Label>Subcategoría Padre</Label>
@@ -455,6 +675,7 @@ export default function CategoryManager() {
                 setIsAddDialogOpen(false);
                 setIsAddingSubSubcategory(false);
                 setEditingSubcategory(null);
+                setSelectedParentId(null);
               }}
             >
               Cancelar
@@ -493,6 +714,31 @@ export default function CategoryManager() {
               </Select>
             </div>
             <div className="space-y-2">
+              <Label htmlFor="parentSubcategory">
+                Subcategoría Padre (opcional)
+              </Label>
+              <Select
+                value={selectedParentId || ""}
+                onValueChange={(value) => setSelectedParentId(value || null)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccione una subcategoría padre (opcional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Ninguna (nivel superior)</SelectItem>
+                  {getAvailableParentSubcategories().map((subcat) => {
+                    const nameParts = subcat.name.split("/");
+                    const displayName = nameParts[nameParts.length - 1];
+                    return (
+                      <SelectItem key={subcat.id} value={subcat.id}>
+                        {displayName}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="editSubcategoryName">
                 Nombre de la Subcategoría
               </Label>
@@ -515,6 +761,31 @@ export default function CategoryManager() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Está seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. La subcategoría será eliminada
+              permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteSubcategory}
+              className="bg-destructive text-destructive-foreground"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

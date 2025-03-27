@@ -20,6 +20,7 @@ import {
 import CompanyCard from "./CompanyCard";
 import CompanyEditor from "./CompanyEditor";
 import CompanySpecifications from "./CompanySpecifications";
+import CompanyView from "./CompanyView";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -51,6 +52,7 @@ export default function CompanyList() {
   const [companies, setCompanies] = useState<CompanyItem[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [isViewingSpecifications, setIsViewingSpecifications] = useState(false);
+  const [isViewingCompany, setIsViewingCompany] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<CompanyItem | null>(
     null,
   );
@@ -220,6 +222,26 @@ export default function CompanyList() {
       setIsViewingSpecifications(true);
     }
   };
+
+  const handleViewCompany = (id: string) => {
+    const company = companies.find((item) => item.id === id);
+    if (company) {
+      setSelectedCompany(company);
+      setIsViewingCompany(true);
+    }
+  };
+
+  if (isViewingCompany && selectedCompany) {
+    return (
+      <CompanyView
+        companyId={selectedCompany.id}
+        onBack={() => {
+          setIsViewingCompany(false);
+          setSelectedCompany(null);
+        }}
+      />
+    );
+  }
 
   if (isViewingSpecifications && selectedCompany) {
     return (
@@ -411,9 +433,16 @@ export default function CompanyList() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleViewSpecifications(company.id)}
+                        onClick={() => handleViewCompany(company.id)}
                       >
                         Ver
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleViewSpecifications(company.id)}
+                      >
+                        Especificaciones
                       </Button>
                       <Button
                         variant="ghost"

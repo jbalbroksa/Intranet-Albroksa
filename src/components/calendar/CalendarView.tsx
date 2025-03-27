@@ -57,9 +57,12 @@ export default function CalendarView() {
 
   useEffect(() => {
     if (date && events.length > 0) {
-      const eventsForDate = events.filter((event) =>
-        isSameDay(new Date(event.event_date), date),
-      );
+      const eventsForDate = events.filter((event) => {
+        // Ensure event_date is properly parsed as a date
+        if (!event.event_date) return false;
+        const eventDate = new Date(event.event_date);
+        return isSameDay(eventDate, date);
+      });
       setFilteredEvents(eventsForDate);
     } else {
       setFilteredEvents([]);

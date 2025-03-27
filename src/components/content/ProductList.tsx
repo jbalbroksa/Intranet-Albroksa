@@ -1,16 +1,20 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent } from "@/components/ui/card";
+import { PlusCircle, Search, Filter, ArrowLeft } from "lucide-react";
+import ProductCard from "./ProductCard";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { useSupabase } from "@/hooks/useSupabase";
+import { useToast } from "@/components/ui/use-toast";
+import { Input } from "@/components/ui/input";
+import ProductEditor from "./ProductEditor";
+import { useNavigate } from "react-router-dom";
 import {
   Select,
   SelectContent,
@@ -18,33 +22,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Filter,
-  PlusCircle,
-  Search,
-  Edit,
-  Trash,
-  ChevronRight,
-  ChevronDown,
-  BookOpen,
-  LayoutGrid,
-  List,
-} from "lucide-react";
-import ProductCard from "./ProductCard";
-import ProductEditor from "./ProductEditor";
-import { supabase } from "@/lib/supabase";
-import { useToast } from "@/components/ui/use-toast";
+
+const MAIN_CATEGORIES = [
+  "Seguro para particulares",
+  "Seguros para empresas",
+  "Seguros Agrarios",
+  "Seguros Personales",
+];
 
 export interface ProductItem {
   id: string;
   title: string;
   content: string;
-  procesos: string;
-  debilidades: string;
-  observaciones: string;
-  excerpt: string;
+  procesos?: string;
+  debilidades?: string;
+  observaciones?: string;
+  excerpt?: string;
   category: string;
-  subcategory: string | null;
+  subcategory?: string;
+  company_id?: string;
+  company_name?: string;
   author: {
     name: string;
     avatar: string;
@@ -55,57 +52,29 @@ export interface ProductItem {
   tags: string[];
 }
 
-const MAIN_CATEGORIES = [
-  "Seguro para particulares",
-  "Seguros para empresas",
-  "Seguros Agrarios",
-  "Seguros Personales",
-];
-
-export default function ProductList() {
-  const navigate = useNavigate();
-  const { toast } = useToast();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState(
-    "Todas las Categorías",
-  );
-  const [selectedSubcategory, setSelectedSubcategory] = useState(
-    "Todas las Subcategorías",
-  );
+function ProductList() {
   const [products, setProducts] = useState<ProductItem[]>([]);
-  const [subcategories, setSubcategories] = useState<string[]>([]);
-  const [isEditing, setIsEditing] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(
-    null,
-  );
-  const [isLoading, setIsLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
-
-  // State for expanded categories and subcategories
-  const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
-  const [expandedSubcategories, setExpandedSubcategories] = useState<string[]>(
-    [],
-  );
-
-  // Fetch products and subcategories
-  useEffect(() => {
-    fetchProducts();
-    fetchSubcategories();
-  }, []);
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<any | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("Todas");
+  const { supabase } = useSupabase();
+  const { toast } = useToast();
+  const navigate = useNavigate();
 
   const fetchProducts = async () => {
-    setIsLoading(true);
     try {
       const { data, error } = await supabase
         .from("content")
         .select(
           `
-          *,
+          id, title, content, procesos, debilidades, observaciones, excerpt, category, subcategory, company_id, author_id, status, created_at, updated_at, published_at,
           users:author_id(id, full_name, avatar_url),
+          companies:company_id(id, name),
           content_tags(id, tag)
         `,
         )
-        .order("updated_at", { ascending: false });
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
 
@@ -113,13 +82,15 @@ export default function ProductList() {
         const formattedProducts = data.map((item) => ({
           id: item.id,
           title: item.title,
-          content: item.content,
+          content: item.content || "",
           procesos: item.procesos || "",
           debilidades: item.debilidades || "",
           observaciones: item.observaciones || "",
           excerpt: item.excerpt || "",
           category: item.category,
           subcategory: item.subcategory,
+          company_id: item.company_id,
+          company_name: item.companies?.name,
           author: {
             name: item.users?.full_name || "Usuario",
             avatar:
@@ -133,128 +104,57 @@ export default function ProductList() {
         }));
         setProducts(formattedProducts);
       }
-    } catch (error) {
-      console.error("Error fetching products:", error);
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "No se pudieron cargar los productos",
+        description: `Error al cargar productos: ${error.message}`,
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
-  const fetchSubcategories = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("content_subcategories")
-        .select("*")
-        .order("name", { ascending: true });
+  useEffect(() => {
+    fetchProducts();
+  }, []);
 
-      if (error) throw error;
-
-      if (data) {
-        const subcategoryNames = data.map((item) => item.name);
-        setSubcategories(subcategoryNames);
-      }
-    } catch (error) {
-      console.error("Error fetching subcategories:", error);
-    }
+  const handleEdit = (product: ProductItem) => {
+    navigate(`/content/${product.id}`);
   };
 
-  const filteredProducts = products.filter((item) => {
-    const matchesSearch =
-      item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.tags.some((tag) =>
-        tag.toLowerCase().includes(searchQuery.toLowerCase()),
-      );
-
-    const matchesCategory =
-      selectedCategory === "Todas las Categorías" ||
-      item.category === selectedCategory;
-
-    const matchesSubcategory =
-      selectedSubcategory === "Todas las Subcategorías" ||
-      item.subcategory === selectedSubcategory;
-
-    return matchesSearch && matchesCategory && matchesSubcategory;
-  });
-
-  const handleCreateProduct = () => {
-    setSelectedProduct(null);
-    setIsEditing(true);
-  };
-
-  const handleEditProduct = (id: string) => {
-    const product = products.find((item) => item.id === id);
-    if (product) {
-      setSelectedProduct(product);
-      setIsEditing(true);
-    }
-  };
-
-  const handleDeleteProduct = async (id: string) => {
+  const handleDelete = async (id: string) => {
     try {
       const { error } = await supabase.from("content").delete().eq("id", id);
 
       if (error) throw error;
 
-      setProducts(products.filter((item) => item.id !== id));
+      setProducts(products.filter((product) => product.id !== id));
       toast({
-        title: "Producto eliminado",
-        description: "El producto ha sido eliminado correctamente",
+        title: "Éxito",
+        description: "Producto eliminado correctamente",
       });
-    } catch (error) {
-      console.error("Error deleting product:", error);
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "No se pudo eliminar el producto",
+        description: `Error al eliminar producto: ${error.message}`,
         variant: "destructive",
       });
     }
   };
 
-  // Function to view a product
-  const handleViewProduct = (id: string) => {
-    navigate(`/content/${id}`);
-  };
-
-  // Toggle category expansion
-  const toggleCategory = (category: string) => {
-    setExpandedCategories((prev) =>
-      prev.includes(category)
-        ? prev.filter((c) => c !== category)
-        : [...prev, category],
-    );
-  };
-
-  // Toggle subcategory expansion
-  const toggleSubcategory = (subcategory: string) => {
-    setExpandedSubcategories((prev) =>
-      prev.includes(subcategory)
-        ? prev.filter((s) => s !== subcategory)
-        : [...prev, subcategory],
-    );
-  };
-
-  const handleSaveProduct = async (productData: {
-    title: string;
-    content: string;
-    procesos: string;
-    debilidades: string;
-    observaciones: string;
-    category: string;
-    subcategory?: string;
-    tags: string[];
-    status: "published" | "draft";
-  }) => {
+  const handleSave = async (productData: any) => {
     try {
-      const excerpt = productData.content.substring(0, 150) + "...";
-      const isPublished = productData.status === "published";
+      const userId = (await supabase.auth.getUser()).data.user?.id;
 
-      if (selectedProduct) {
+      if (!userId) {
+        toast({
+          title: "Error",
+          description: "Debe iniciar sesión para crear o editar productos",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (editingProduct) {
         // Update existing product
         const { data, error } = await supabase
           .from("content")
@@ -264,162 +164,167 @@ export default function ProductList() {
             procesos: productData.procesos,
             debilidades: productData.debilidades,
             observaciones: productData.observaciones,
-            excerpt,
             category: productData.category,
-            subcategory: productData.subcategory || null,
-            status: productData.status,
-            published_at: isPublished ? new Date().toISOString() : null,
+            subcategory: productData.subcategory,
+            company_id:
+              productData.company_id === "none" ? null : productData.company_id,
             updated_at: new Date().toISOString(),
           })
-          .eq("id", selectedProduct.id)
-          .select()
-          .single();
+          .eq("id", editingProduct.id)
+          .select();
 
         if (error) throw error;
 
-        // Delete existing tags and add new ones
-        await supabase
-          .from("content_tags")
-          .delete()
-          .eq("content_id", selectedProduct.id);
-
-        if (productData.tags.length > 0) {
-          const tagInserts = productData.tags.map((tag) => ({
-            content_id: selectedProduct.id,
-            tag,
-          }));
-
-          const { error: tagError } = await supabase
-            .from("content_tags")
-            .insert(tagInserts);
-
-          if (tagError) throw tagError;
-        }
-
         toast({
-          title: "Producto actualizado",
-          description: "El producto ha sido actualizado correctamente",
+          title: "Éxito",
+          description: "Producto actualizado correctamente",
         });
       } else {
-        // Get current user
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (!user) throw new Error("Usuario no autenticado");
-
         // Create new product
         const { data, error } = await supabase
           .from("content")
-          .insert({
-            title: productData.title,
-            content: productData.content,
-            procesos: productData.procesos,
-            debilidades: productData.debilidades,
-            observaciones: productData.observaciones,
-            excerpt,
-            category: productData.category,
-            subcategory: productData.subcategory || null,
-            status: productData.status,
-            author_id: user.id,
-            published_at: isPublished ? new Date().toISOString() : null,
-          })
-          .select()
-          .single();
+          .insert([
+            {
+              title: productData.title,
+              content: productData.content,
+              procesos: productData.procesos,
+              debilidades: productData.debilidades,
+              observaciones: productData.observaciones,
+              category: productData.category,
+              subcategory: productData.subcategory,
+              company_id:
+                productData.company_id === "none"
+                  ? null
+                  : productData.company_id,
+              author_id: userId,
+              status: "published",
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            },
+          ])
+          .select();
 
         if (error) throw error;
 
-        // Add tags if provided
-        if (productData.tags.length > 0) {
-          const tagInserts = productData.tags.map((tag) => ({
-            content_id: data.id,
-            tag,
-          }));
-
-          const { error: tagError } = await supabase
-            .from("content_tags")
-            .insert(tagInserts);
-
-          if (tagError) throw tagError;
-        }
-
         toast({
-          title: "Producto creado",
-          description: "El producto ha sido creado correctamente",
+          title: "Éxito",
+          description: "Producto creado correctamente",
         });
       }
 
-      // Refresh products list
+      setIsEditorOpen(false);
+      setEditingProduct(null);
       fetchProducts();
-      setIsEditing(false);
-      setSelectedProduct(null);
-    } catch (error) {
-      console.error("Error saving product:", error);
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "No se pudo guardar el producto",
+        description: `Error al guardar producto: ${error.message}`,
         variant: "destructive",
       });
     }
   };
 
-  if (isEditing) {
-    return (
-      <ProductEditor
-        initialProduct={
-          selectedProduct
-            ? {
-                title: selectedProduct.title,
-                content: selectedProduct.content,
-                procesos: selectedProduct.procesos,
-                debilidades: selectedProduct.debilidades,
-                observaciones: selectedProduct.observaciones,
-                category: selectedProduct.category,
-                subcategory: selectedProduct.subcategory || undefined,
-                tags: selectedProduct.tags,
-                status: selectedProduct.status,
-              }
-            : undefined
-        }
-        mainCategories={MAIN_CATEGORIES}
-        subcategories={subcategories}
-        onSave={handleSaveProduct}
-        onCancel={() => {
-          setIsEditing(false);
-          setSelectedProduct(null);
-        }}
-      />
-    );
-  }
+  const filteredProducts = products.filter((product) => {
+    const matchesSearch =
+      product.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      product.content.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesCategory =
+      selectedCategory === "Todas" || product.category === selectedCategory;
+
+    return matchesSearch && matchesCategory;
+  });
+
+  // Function to get all subcategories for a category
+  const fetchSubcategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("content_subcategories")
+        .select("*")
+        .order("parent_category", { ascending: true })
+        .order("level", { ascending: true })
+        .order("name", { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error("Error fetching subcategories:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar las subcategorías",
+        variant: "destructive",
+      });
+      return [];
+    }
+  };
+
+  // State for subcategories
+  const [subcategories, setSubcategories] = useState<any[]>([]);
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(
+    null,
+  );
+
+  // Fetch subcategories when category changes
+  useEffect(() => {
+    if (selectedCategory !== "Todas") {
+      fetchSubcategories().then((data) => {
+        const categorySubcats = data.filter(
+          (s) => s.parent_category === selectedCategory,
+        );
+        setSubcategories(categorySubcats);
+        setSelectedSubcategory(null); // Reset selected subcategory when category changes
+      });
+    }
+  }, [selectedCategory]);
+
+  // Function to get display name from full subcategory name
+  const getSubcategoryDisplayName = (fullName: string) => {
+    const parts = fullName.split("/");
+    return parts.length > 1 ? parts[parts.length - 1] : fullName;
+  };
+
+  // Function to organize subcategories into a hierarchical structure
+  const organizeSubcategories = (subcats: any[]) => {
+    // First, get top-level subcategories (those without a parent_id)
+    const topLevel = subcats.filter((s) => !s.parent_id);
+
+    // Function to get child subcategories for a given parent
+    const getChildren = (parentId: string) => {
+      return subcats.filter((s) => s.parent_id === parentId);
+    };
+
+    // Function to build the tree recursively
+    const buildTree = (subcategory: any) => {
+      const children = getChildren(subcategory.id);
+      return {
+        ...subcategory,
+        children: children.map(buildTree),
+        displayName: getSubcategoryDisplayName(subcategory.name),
+      };
+    };
+
+    // Build the tree for each top-level subcategory
+    return topLevel.map(buildTree);
+  };
+
+  // Get products for the selected subcategory
+  const getProductsForSubcategory = (subcategoryName: string) => {
+    return filteredProducts.filter((p) => p.subcategory === subcategoryName);
+  };
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-        <h1 className="text-2xl font-bold">Base de Conocimientos</h1>
-        <div className="flex items-center gap-2">
-          <div className="bg-muted rounded-md flex items-center p-1">
-            <Button
-              variant={viewMode === "grid" ? "secondary" : "ghost"}
-              size="sm"
-              className="h-8 w-8 p-0"
-              onClick={() => setViewMode("grid")}
-              aria-label="Vista de cuadrícula"
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={viewMode === "table" ? "secondary" : "ghost"}
-              size="sm"
-              className="h-8 w-8 p-0"
-              onClick={() => setViewMode("table")}
-              aria-label="Vista de tabla"
-            >
-              <List className="h-4 w-4" />
-            </Button>
-          </div>
-          <Button onClick={handleCreateProduct}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Crear Producto
-          </Button>
-        </div>
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <h2 className="text-2xl font-bold">Base de Conocimientos</h2>
+        <Button
+          onClick={() => {
+            setEditingProduct(null);
+            setIsEditorOpen(true);
+          }}
+        >
+          <PlusCircle className="mr-2 h-4 w-4" />
+          Nuevo Producto
+        </Button>
       </div>
 
       <div className="flex flex-col md:flex-row gap-4 mb-6">
@@ -433,14 +338,12 @@ export default function ProductList() {
           />
         </div>
         <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-          <SelectTrigger className="w-full md:w-[220px]">
+          <SelectTrigger className="w-full md:w-[250px]">
             <Filter className="mr-2 h-4 w-4" />
             <SelectValue placeholder="Categoría" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="Todas las Categorías">
-              Todas las Categorías
-            </SelectItem>
+            <SelectItem value="Todas">Todas las categorías</SelectItem>
             {MAIN_CATEGORIES.map((category) => (
               <SelectItem key={category} value={category}>
                 {category}
@@ -448,1002 +351,205 @@ export default function ProductList() {
             ))}
           </SelectContent>
         </Select>
-        {selectedCategory !== "Todas las Categorías" && (
-          <Select
-            value={selectedSubcategory}
-            onValueChange={setSelectedSubcategory}
-          >
-            <SelectTrigger className="w-full md:w-[220px]">
-              <Filter className="mr-2 h-4 w-4" />
-              <SelectValue placeholder="Subcategoría" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Todas las Subcategorías">
-                Todas las Subcategorías
-              </SelectItem>
-              {subcategories
-                .filter((subcat) => {
-                  // Only show subcategories related to the selected main category
-                  const subcatParts = subcat.split("/");
-                  return (
-                    subcatParts.length > 1 &&
-                    subcatParts[0] === selectedCategory
-                  );
-                })
-                .map((subcategory) => (
-                  <SelectItem key={subcategory} value={subcategory}>
-                    {subcategory.split("/")[1]}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
-        )}
       </div>
 
-      <Tabs defaultValue="all" className="flex-1">
-        <TabsList className="mb-4">
-          <TabsTrigger value="all">Todos los Productos</TabsTrigger>
-          <TabsTrigger value="published">Publicados</TabsTrigger>
-          <TabsTrigger value="drafts">Borradores</TabsTrigger>
-        </TabsList>
+      {selectedCategory !== "Todas" ? (
+        <div className="space-y-6">
+          <h3 className="text-xl font-semibold">{selectedCategory}</h3>
 
-        <TabsContent value="all" className="flex-1">
-          {isLoading ? (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground">Cargando productos...</p>
+          {/* Display subcategories as cards */}
+          {!selectedSubcategory && subcategories.length > 0 && (
+            <div className="space-y-4">
+              <h4 className="text-lg font-medium">Subcategorías</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {organizeSubcategories(subcategories).map((subcat) => (
+                  <Card
+                    key={subcat.id}
+                    className="cursor-pointer hover:shadow-md transition-shadow"
+                    onClick={() => setSelectedSubcategory(subcat.name)}
+                  >
+                    <CardContent className="p-4">
+                      <h5 className="font-medium text-lg">
+                        {subcat.displayName}
+                      </h5>
+                      {subcat.children.length > 0 && (
+                        <p className="text-sm text-muted-foreground mt-2">
+                          {subcat.children.length} subcategorías
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             </div>
-          ) : filteredProducts.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground">
-                No se encontraron productos. Intente ajustar su búsqueda o
-                filtros.
-              </p>
-            </div>
-          ) : viewMode === "grid" ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {selectedCategory !== "Todas las Categorías" ? (
-                // Show products for selected category
-                <Card className="col-span-full">
-                  <CardHeader className="pb-3">
-                    <CardTitle>{selectedCategory}</CardTitle>
-                    <CardDescription>
-                      {selectedSubcategory !== "Todas las Subcategorías"
-                        ? `Subcategoría: ${selectedSubcategory.split("/")[1] || selectedSubcategory}`
-                        : "Todas las subcategorías"}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {selectedSubcategory !== "Todas las Subcategorías" ? (
-                      // Show products for selected subcategory
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {filteredProducts.map((product) => (
-                          <ProductCard
-                            key={product.id}
-                            product={product}
-                            onEdit={() => handleEditProduct(product.id)}
-                            onDelete={() => handleDeleteProduct(product.id)}
-                            onView={() => handleViewProduct(product.id)}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      // Group by subcategory
-                      <div className="space-y-6">
-                        {Array.from(
-                          new Set(filteredProducts.map((p) => p.subcategory)),
-                        ).map((subcategory) => {
-                          const subcategoryProducts = filteredProducts.filter(
-                            (p) => p.subcategory === subcategory,
-                          );
-                          if (subcategoryProducts.length === 0) return null;
+          )}
 
-                          const isExpanded = expandedSubcategories.includes(
-                            subcategory || "none",
-                          );
+          {/* Display products for selected subcategory */}
+          {selectedSubcategory ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedSubcategory(null)}
+                >
+                  <ArrowLeft className="h-4 w-4 mr-2" /> Volver a subcategorías
+                </Button>
+                <h4 className="text-lg font-medium">
+                  {getSubcategoryDisplayName(selectedSubcategory)}
+                </h4>
+              </div>
 
-                          return (
-                            <div key={subcategory || "none"}>
-                              <Button
-                                variant="ghost"
-                                className="w-full justify-between mb-2 font-medium text-left"
-                                onClick={() =>
-                                  toggleSubcategory(subcategory || "none")
-                                }
-                              >
-                                <span>
-                                  {subcategory
-                                    ? subcategory.split("/")[1] || subcategory
-                                    : "Sin subcategoría"}
-                                </span>
-                                {isExpanded ? (
-                                  <ChevronDown className="h-4 w-4" />
-                                ) : (
-                                  <ChevronRight className="h-4 w-4" />
-                                )}
-                              </Button>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {getProductsForSubcategory(selectedSubcategory).map(
+                  (product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={{
+                        id: product.id,
+                        name: product.title,
+                        description:
+                          product.excerpt ||
+                          product.content
+                            .replace(/<[^>]*>/g, "")
+                            .substring(0, 100) + "...",
+                        company_id: product.company_id,
+                        company_name: product.company_name,
+                        created_at: product.updatedAt.toISOString(),
+                      }}
+                      onEdit={() => handleEdit(product)}
+                      onDelete={() => handleDelete(product.id)}
+                    />
+                  ),
+                )}
+              </div>
 
-                              {isExpanded && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-2">
-                                  {subcategoryProducts.map((product) => (
-                                    <ProductCard
-                                      key={product.id}
-                                      product={product}
-                                      onEdit={() =>
-                                        handleEditProduct(product.id)
-                                      }
-                                      onDelete={() =>
-                                        handleDeleteProduct(product.id)
-                                      }
-                                      onView={() =>
-                                        handleViewProduct(product.id)
-                                      }
-                                    />
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ) : (
-                // Show all categories as cards
-                MAIN_CATEGORIES.map((category) => {
-                  const categoryProducts = filteredProducts.filter(
-                    (p) => p.category === category,
-                  );
-                  if (categoryProducts.length === 0) return null;
-
-                  const isExpanded = expandedCategories.includes(category);
-
-                  return (
-                    <Card key={category} className="col-span-1">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="flex items-center justify-between">
-                          <span>{category}</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => toggleCategory(category)}
-                            className="ml-2"
-                          >
-                            {isExpanded ? (
-                              <ChevronDown className="h-4 w-4" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </CardTitle>
-                        <CardDescription>
-                          {categoryProducts.length} producto
-                          {categoryProducts.length !== 1 ? "s" : ""}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        {!isExpanded ? (
-                          <div className="flex justify-center items-center py-6">
-                            <BookOpen className="h-12 w-12 text-muted-foreground opacity-50" />
-                          </div>
-                        ) : (
-                          <div className="space-y-4">
-                            {Array.from(
-                              new Set(
-                                categoryProducts.map((p) => p.subcategory),
-                              ),
-                            ).map((subcategory) => {
-                              const subcategoryProducts =
-                                categoryProducts.filter(
-                                  (p) => p.subcategory === subcategory,
-                                );
-                              if (subcategoryProducts.length === 0) return null;
-
-                              const isSubExpanded =
-                                expandedSubcategories.includes(
-                                  `${category}-${subcategory || "none"}`,
-                                );
-
-                              return (
-                                <div key={subcategory || "none"}>
-                                  <Button
-                                    variant="ghost"
-                                    className="w-full justify-between mb-2 font-medium text-left"
-                                    onClick={() =>
-                                      toggleSubcategory(
-                                        `${category}-${subcategory || "none"}`,
-                                      )
-                                    }
-                                  >
-                                    <span>
-                                      {subcategory
-                                        ? subcategory.split("/")[1] ||
-                                          subcategory
-                                        : "Sin subcategoría"}
-                                    </span>
-                                    {isSubExpanded ? (
-                                      <ChevronDown className="h-4 w-4" />
-                                    ) : (
-                                      <ChevronRight className="h-4 w-4" />
-                                    )}
-                                  </Button>
-
-                                  {isSubExpanded && (
-                                    <div className="space-y-2">
-                                      {subcategoryProducts.map((product) => (
-                                        <div
-                                          key={product.id}
-                                          className="p-2 hover:bg-muted rounded-md cursor-pointer flex justify-between items-center"
-                                          onClick={() =>
-                                            handleViewProduct(product.id)
-                                          }
-                                        >
-                                          <span className="line-clamp-1">
-                                            {product.title}
-                                          </span>
-                                          <div className="flex gap-2">
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleEditProduct(product.id);
-                                              }}
-                                            >
-                                              <Edit className="h-4 w-4" />
-                                            </Button>
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleDeleteProduct(product.id);
-                                              }}
-                                            >
-                                              <Trash className="h-4 w-4 text-red-500" />
-                                            </Button>
-                                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </CardContent>
-                      <CardFooter className="pt-2 border-t">
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-center"
-                          onClick={() => toggleCategory(category)}
-                        >
-                          {isExpanded ? "Colapsar" : "Expandir"}
-                        </Button>
-                      </CardFooter>
-                    </Card>
-                  );
-                })
+              {getProductsForSubcategory(selectedSubcategory).length === 0 && (
+                <div className="text-center py-12 border rounded-md">
+                  <p className="text-muted-foreground">
+                    No hay productos en esta subcategoría.
+                  </p>
+                </div>
               )}
             </div>
           ) : (
-            <div className="rounded-md border">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-muted/50">
-                    <th className="p-2 text-left font-medium">Título</th>
-                    <th className="p-2 text-left font-medium">Categoría</th>
-                    <th className="p-2 text-left font-medium">Subcategoría</th>
-                    <th className="p-2 text-left font-medium">Autor</th>
-                    <th className="p-2 text-left font-medium">Estado</th>
-                    <th className="p-2 text-center font-medium">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredProducts.map((product) => (
-                    <tr key={product.id} className="border-t hover:bg-muted/50">
-                      <td className="p-2 font-medium">{product.title}</td>
-                      <td className="p-2">{product.category}</td>
-                      <td className="p-2">
-                        {product.subcategory ? (
-                          product.subcategory.split("/")[1] ||
-                          product.subcategory
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </td>
-                      <td className="p-2">
-                        <div className="flex items-center gap-2">
-                          <img
-                            src={product.author.avatar}
-                            alt={product.author.name}
-                            className="h-6 w-6 rounded-full"
-                          />
-                          <span>{product.author.name}</span>
-                        </div>
-                      </td>
-                      <td className="p-2">
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs ${product.status === "published" ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}
-                        >
-                          {product.status === "published"
-                            ? "Publicado"
-                            : "Borrador"}
-                        </span>
-                      </td>
-                      <td className="p-2">
-                        <div className="flex justify-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleViewProduct(product.id)}
-                          >
-                            Ver
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditProduct(product.id)}
-                          >
-                            Editar
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteProduct(product.id)}
-                            className="text-red-500"
-                          >
-                            Eliminar
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
+            <div className="space-y-4">
+              <h4 className="text-lg font-medium">
+                Productos sin subcategoría
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredProducts
+                  .filter((p) => !p.subcategory)
+                  .map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={{
+                        id: product.id,
+                        name: product.title,
+                        description:
+                          product.excerpt ||
+                          product.content
+                            .replace(/<[^>]*>/g, "")
+                            .substring(0, 100) + "...",
+                        company_id: product.company_id,
+                        company_name: product.company_name,
+                        created_at: product.updatedAt.toISOString(),
+                      }}
+                      onEdit={() => handleEdit(product)}
+                      onDelete={() => handleDelete(product.id)}
+                    />
                   ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </TabsContent>
+              </div>
 
-        <TabsContent value="published">
-          {viewMode === "grid" ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {selectedCategory !== "Todas las Categorías" ? (
-                // Show published products for selected category
-                <Card className="col-span-full">
-                  <CardHeader className="pb-3">
-                    <CardTitle>{selectedCategory} - Publicados</CardTitle>
-                    <CardDescription>
-                      {selectedSubcategory !== "Todas las Subcategorías"
-                        ? `Subcategoría: ${selectedSubcategory.split("/")[1] || selectedSubcategory}`
-                        : "Todas las subcategorías"}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {selectedSubcategory !== "Todas las Subcategorías" ? (
-                      // Show published products for selected subcategory
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {filteredProducts
-                          .filter((product) => product.status === "published")
-                          .map((product) => (
-                            <ProductCard
-                              key={product.id}
-                              product={product}
-                              onEdit={() => handleEditProduct(product.id)}
-                              onDelete={() => handleDeleteProduct(product.id)}
-                              onView={() => handleViewProduct(product.id)}
-                            />
-                          ))}
-                      </div>
-                    ) : (
-                      // Group published products by subcategory
-                      <div className="space-y-6">
-                        {Array.from(
-                          new Set(
-                            filteredProducts
-                              .filter((p) => p.status === "published")
-                              .map((p) => p.subcategory),
-                          ),
-                        ).map((subcategory) => {
-                          const subcategoryProducts = filteredProducts.filter(
-                            (p) =>
-                              p.status === "published" &&
-                              p.subcategory === subcategory,
-                          );
-                          if (subcategoryProducts.length === 0) return null;
-
-                          const isExpanded = expandedSubcategories.includes(
-                            `published-${subcategory || "none"}`,
-                          );
-
-                          return (
-                            <div key={subcategory || "none"}>
-                              <Button
-                                variant="ghost"
-                                className="w-full justify-between mb-2 font-medium text-left"
-                                onClick={() =>
-                                  toggleSubcategory(
-                                    `published-${subcategory || "none"}`,
-                                  )
-                                }
-                              >
-                                <span>
-                                  {subcategory
-                                    ? subcategory.split("/")[1] || subcategory
-                                    : "Sin subcategoría"}
-                                </span>
-                                {isExpanded ? (
-                                  <ChevronDown className="h-4 w-4" />
-                                ) : (
-                                  <ChevronRight className="h-4 w-4" />
-                                )}
-                              </Button>
-
-                              {isExpanded && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-2">
-                                  {subcategoryProducts.map((product) => (
-                                    <ProductCard
-                                      key={product.id}
-                                      product={product}
-                                      onEdit={() =>
-                                        handleEditProduct(product.id)
-                                      }
-                                      onDelete={() =>
-                                        handleDeleteProduct(product.id)
-                                      }
-                                      onView={() =>
-                                        handleViewProduct(product.id)
-                                      }
-                                    />
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ) : (
-                // Show all published products by category
-                MAIN_CATEGORIES.map((category) => {
-                  const categoryProducts = filteredProducts.filter(
-                    (p) => p.status === "published" && p.category === category,
-                  );
-                  if (categoryProducts.length === 0) return null;
-
-                  const isExpanded = expandedCategories.includes(
-                    `published-${category}`,
-                  );
-
-                  return (
-                    <Card key={category} className="col-span-1">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="flex items-center justify-between">
-                          <span>{category}</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              toggleCategory(`published-${category}`)
-                            }
-                            className="ml-2"
-                          >
-                            {isExpanded ? (
-                              <ChevronDown className="h-4 w-4" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </CardTitle>
-                        <CardDescription>
-                          {categoryProducts.length} producto
-                          {categoryProducts.length !== 1 ? "s" : ""} publicado
-                          {categoryProducts.length !== 1 ? "s" : ""}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        {!isExpanded ? (
-                          <div className="flex justify-center items-center py-6">
-                            <BookOpen className="h-12 w-12 text-muted-foreground opacity-50" />
-                          </div>
-                        ) : (
-                          <div className="space-y-4">
-                            {Array.from(
-                              new Set(
-                                categoryProducts.map((p) => p.subcategory),
-                              ),
-                            ).map((subcategory) => {
-                              const subcategoryProducts =
-                                categoryProducts.filter(
-                                  (p) => p.subcategory === subcategory,
-                                );
-                              if (subcategoryProducts.length === 0) return null;
-
-                              const isSubExpanded =
-                                expandedSubcategories.includes(
-                                  `published-${category}-${subcategory || "none"}`,
-                                );
-
-                              return (
-                                <div key={subcategory || "none"}>
-                                  <Button
-                                    variant="ghost"
-                                    className="w-full justify-between mb-2 font-medium text-left"
-                                    onClick={() =>
-                                      toggleSubcategory(
-                                        `published-${category}-${subcategory || "none"}`,
-                                      )
-                                    }
-                                  >
-                                    <span>
-                                      {subcategory
-                                        ? subcategory.split("/")[1] ||
-                                          subcategory
-                                        : "Sin subcategoría"}
-                                    </span>
-                                    {isSubExpanded ? (
-                                      <ChevronDown className="h-4 w-4" />
-                                    ) : (
-                                      <ChevronRight className="h-4 w-4" />
-                                    )}
-                                  </Button>
-
-                                  {isSubExpanded && (
-                                    <div className="space-y-2">
-                                      {subcategoryProducts.map((product) => (
-                                        <div
-                                          key={product.id}
-                                          className="p-2 hover:bg-muted rounded-md cursor-pointer flex justify-between items-center"
-                                          onClick={() =>
-                                            handleViewProduct(product.id)
-                                          }
-                                        >
-                                          <span className="line-clamp-1">
-                                            {product.title}
-                                          </span>
-                                          <div className="flex gap-2">
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleEditProduct(product.id);
-                                              }}
-                                            >
-                                              <Edit className="h-4 w-4" />
-                                            </Button>
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleDeleteProduct(product.id);
-                                              }}
-                                            >
-                                              <Trash className="h-4 w-4 text-red-500" />
-                                            </Button>
-                                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </CardContent>
-                      <CardFooter className="pt-2 border-t">
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-center"
-                          onClick={() =>
-                            toggleCategory(`published-${category}`)
-                          }
-                        >
-                          {isExpanded ? "Colapsar" : "Expandir"}
-                        </Button>
-                      </CardFooter>
-                    </Card>
-                  );
-                })
+              {filteredProducts.filter((p) => !p.subcategory).length === 0 && (
+                <div className="text-center py-12 border rounded-md">
+                  <p className="text-muted-foreground">
+                    No hay productos sin subcategoría.
+                  </p>
+                </div>
               )}
             </div>
-          ) : (
-            <div className="rounded-md border">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-muted/50">
-                    <th className="p-2 text-left font-medium">Título</th>
-                    <th className="p-2 text-left font-medium">Categoría</th>
-                    <th className="p-2 text-left font-medium">Subcategoría</th>
-                    <th className="p-2 text-left font-medium">Autor</th>
-                    <th className="p-2 text-center font-medium">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredProducts
-                    .filter((product) => product.status === "published")
-                    .map((product) => (
-                      <tr
-                        key={product.id}
-                        className="border-t hover:bg-muted/50"
-                      >
-                        <td className="p-2 font-medium">{product.title}</td>
-                        <td className="p-2">{product.category}</td>
-                        <td className="p-2">
-                          {product.subcategory ? (
-                            product.subcategory.split("/")[1] ||
-                            product.subcategory
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </td>
-                        <td className="p-2">
-                          <div className="flex items-center gap-2">
-                            <img
-                              src={product.author.avatar}
-                              alt={product.author.name}
-                              className="h-6 w-6 rounded-full"
-                            />
-                            <span>{product.author.name}</span>
-                          </div>
-                        </td>
-                        <td className="p-2">
-                          <div className="flex justify-center gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleViewProduct(product.id)}
-                            >
-                              Ver
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEditProduct(product.id)}
-                            >
-                              Editar
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteProduct(product.id)}
-                              className="text-red-500"
-                            >
-                              Eliminar
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
           )}
-        </TabsContent>
+        </div>
+      ) : (
+        <div>
+          <h3 className="text-xl font-semibold mb-4">Categorías</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            {MAIN_CATEGORIES.map((category) => (
+              <Card
+                key={category}
+                className="cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => setSelectedCategory(category)}
+              >
+                <CardContent className="p-4">
+                  <h4 className="font-medium text-lg">{category}</h4>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    {
+                      filteredProducts.filter((p) => p.category === category)
+                        .length
+                    }{" "}
+                    productos
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
 
-        <TabsContent value="drafts">
-          {viewMode === "grid" ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {selectedCategory !== "Todas las Categorías" ? (
-                // Show draft products for selected category
-                <Card className="col-span-full">
-                  <CardHeader className="pb-3">
-                    <CardTitle>{selectedCategory} - Borradores</CardTitle>
-                    <CardDescription>
-                      {selectedSubcategory !== "Todas las Subcategorías"
-                        ? `Subcategoría: ${selectedSubcategory.split("/")[1] || selectedSubcategory}`
-                        : "Todas las subcategorías"}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {selectedSubcategory !== "Todas las Subcategorías" ? (
-                      // Show draft products for selected subcategory
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {filteredProducts
-                          .filter((product) => product.status === "draft")
-                          .map((product) => (
-                            <ProductCard
-                              key={product.id}
-                              product={product}
-                              onEdit={() => handleEditProduct(product.id)}
-                              onDelete={() => handleDeleteProduct(product.id)}
-                              onView={() => handleViewProduct(product.id)}
-                            />
-                          ))}
-                      </div>
-                    ) : (
-                      // Group draft products by subcategory
-                      <div className="space-y-6">
-                        {Array.from(
-                          new Set(
-                            filteredProducts
-                              .filter((p) => p.status === "draft")
-                              .map((p) => p.subcategory),
-                          ),
-                        ).map((subcategory) => {
-                          const subcategoryProducts = filteredProducts.filter(
-                            (p) =>
-                              p.status === "draft" &&
-                              p.subcategory === subcategory,
-                          );
-                          if (subcategoryProducts.length === 0) return null;
+          <h3 className="text-xl font-semibold mb-4">Todos los productos</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredProducts.map((product) => (
+              <ProductCard
+                key={product.id}
+                product={{
+                  id: product.id,
+                  name: product.title,
+                  description:
+                    product.excerpt ||
+                    product.content.replace(/<[^>]*>/g, "").substring(0, 100) +
+                      "...",
+                  company_id: product.company_id,
+                  company_name: product.company_name,
+                  created_at: product.updatedAt.toISOString(),
+                }}
+                onEdit={() => handleEdit(product)}
+                onDelete={() => handleDelete(product.id)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
-                          const isExpanded = expandedSubcategories.includes(
-                            `draft-${subcategory || "none"}`,
-                          );
+      {filteredProducts.length === 0 && (
+        <div className="text-center py-12 border rounded-md">
+          <p className="text-muted-foreground">
+            {searchQuery || selectedCategory !== "Todas"
+              ? "No se encontraron productos que coincidan con los criterios de búsqueda."
+              : "No hay productos disponibles. Cree uno nuevo usando el botón de arriba."}
+          </p>
+        </div>
+      )}
 
-                          return (
-                            <div key={subcategory || "none"}>
-                              <Button
-                                variant="ghost"
-                                className="w-full justify-between mb-2 font-medium text-left"
-                                onClick={() =>
-                                  toggleSubcategory(
-                                    `draft-${subcategory || "none"}`,
-                                  )
-                                }
-                              >
-                                <span>
-                                  {subcategory
-                                    ? subcategory.split("/")[1] || subcategory
-                                    : "Sin subcategoría"}
-                                </span>
-                                {isExpanded ? (
-                                  <ChevronDown className="h-4 w-4" />
-                                ) : (
-                                  <ChevronRight className="h-4 w-4" />
-                                )}
-                              </Button>
-
-                              {isExpanded && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-2">
-                                  {subcategoryProducts.map((product) => (
-                                    <ProductCard
-                                      key={product.id}
-                                      product={product}
-                                      onEdit={() =>
-                                        handleEditProduct(product.id)
-                                      }
-                                      onDelete={() =>
-                                        handleDeleteProduct(product.id)
-                                      }
-                                      onView={() =>
-                                        handleViewProduct(product.id)
-                                      }
-                                    />
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ) : (
-                // Show all draft products by category
-                MAIN_CATEGORIES.map((category) => {
-                  const categoryProducts = filteredProducts.filter(
-                    (p) => p.status === "draft" && p.category === category,
-                  );
-                  if (categoryProducts.length === 0) return null;
-
-                  const isExpanded = expandedCategories.includes(
-                    `draft-${category}`,
-                  );
-
-                  return (
-                    <Card key={category} className="col-span-1">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="flex items-center justify-between">
-                          <span>{category}</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => toggleCategory(`draft-${category}`)}
-                            className="ml-2"
-                          >
-                            {isExpanded ? (
-                              <ChevronDown className="h-4 w-4" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </CardTitle>
-                        <CardDescription>
-                          {categoryProducts.length} borrador
-                          {categoryProducts.length !== 1 ? "es" : ""}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        {!isExpanded ? (
-                          <div className="flex justify-center items-center py-6">
-                            <BookOpen className="h-12 w-12 text-muted-foreground opacity-50" />
-                          </div>
-                        ) : (
-                          <div className="space-y-4">
-                            {Array.from(
-                              new Set(
-                                categoryProducts.map((p) => p.subcategory),
-                              ),
-                            ).map((subcategory) => {
-                              const subcategoryProducts =
-                                categoryProducts.filter(
-                                  (p) => p.subcategory === subcategory,
-                                );
-                              if (subcategoryProducts.length === 0) return null;
-
-                              const isSubExpanded =
-                                expandedSubcategories.includes(
-                                  `draft-${category}-${subcategory || "none"}`,
-                                );
-
-                              return (
-                                <div key={subcategory || "none"}>
-                                  <Button
-                                    variant="ghost"
-                                    className="w-full justify-between mb-2 font-medium text-left"
-                                    onClick={() =>
-                                      toggleSubcategory(
-                                        `draft-${category}-${subcategory || "none"}`,
-                                      )
-                                    }
-                                  >
-                                    <span>
-                                      {subcategory
-                                        ? subcategory.split("/")[1] ||
-                                          subcategory
-                                        : "Sin subcategoría"}
-                                    </span>
-                                    {isSubExpanded ? (
-                                      <ChevronDown className="h-4 w-4" />
-                                    ) : (
-                                      <ChevronRight className="h-4 w-4" />
-                                    )}
-                                  </Button>
-
-                                  {isSubExpanded && (
-                                    <div className="space-y-2">
-                                      {subcategoryProducts.map((product) => (
-                                        <div
-                                          key={product.id}
-                                          className="p-2 hover:bg-muted rounded-md cursor-pointer flex justify-between items-center"
-                                          onClick={() =>
-                                            handleViewProduct(product.id)
-                                          }
-                                        >
-                                          <span className="line-clamp-1">
-                                            {product.title}
-                                          </span>
-                                          <div className="flex gap-2">
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleEditProduct(product.id);
-                                              }}
-                                            >
-                                              <Edit className="h-4 w-4" />
-                                            </Button>
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleDeleteProduct(product.id);
-                                              }}
-                                            >
-                                              <Trash className="h-4 w-4 text-red-500" />
-                                            </Button>
-                                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </CardContent>
-                      <CardFooter className="pt-2 border-t">
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-center"
-                          onClick={() => toggleCategory(`draft-${category}`)}
-                        >
-                          {isExpanded ? "Colapsar" : "Expandir"}
-                        </Button>
-                      </CardFooter>
-                    </Card>
-                  );
-                })
-              )}
-            </div>
-          ) : (
-            <div className="rounded-md border">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-muted/50">
-                    <th className="p-2 text-left font-medium">Título</th>
-                    <th className="p-2 text-left font-medium">Categoría</th>
-                    <th className="p-2 text-left font-medium">Subcategoría</th>
-                    <th className="p-2 text-left font-medium">Autor</th>
-                    <th className="p-2 text-center font-medium">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredProducts
-                    .filter((product) => product.status === "draft")
-                    .map((product) => (
-                      <tr
-                        key={product.id}
-                        className="border-t hover:bg-muted/50"
-                      >
-                        <td className="p-2 font-medium">{product.title}</td>
-                        <td className="p-2">{product.category}</td>
-                        <td className="p-2">
-                          {product.subcategory ? (
-                            product.subcategory.split("/")[1] ||
-                            product.subcategory
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </td>
-                        <td className="p-2">
-                          <div className="flex items-center gap-2">
-                            <img
-                              src={product.author.avatar}
-                              alt={product.author.name}
-                              className="h-6 w-6 rounded-full"
-                            />
-                            <span>{product.author.name}</span>
-                          </div>
-                        </td>
-                        <td className="p-2">
-                          <div className="flex justify-center gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleViewProduct(product.id)}
-                            >
-                              Ver
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEditProduct(product.id)}
-                            >
-                              Editar
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteProduct(product.id)}
-                              className="text-red-500"
-                            >
-                              Eliminar
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
+      <Dialog open={isEditorOpen} onOpenChange={setIsEditorOpen}>
+        <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {editingProduct ? "Editar Producto" : "Nuevo Producto"}
+            </DialogTitle>
+            <DialogDescription>
+              {editingProduct
+                ? "Actualice la información del producto"
+                : "Complete la información para crear un nuevo producto"}
+            </DialogDescription>
+          </DialogHeader>
+          <ProductEditor
+            product={editingProduct}
+            onSave={handleSave}
+            onCancel={() => setIsEditorOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
+export default ProductList;

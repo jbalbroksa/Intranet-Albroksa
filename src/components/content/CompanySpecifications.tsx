@@ -28,14 +28,9 @@ interface SpecificationItem {
   id: string;
   category: string;
   subcategory?: string;
+  title?: string;
   content: string;
   updatedAt: Date;
-}
-
-interface SubcategoryItem {
-  id: string;
-  name: string;
-  parent_category: string;
 }
 
 const SPECIFICATION_CATEGORIES = [
@@ -82,25 +77,23 @@ export default function CompanySpecifications({
 }: CompanySpecificationsProps) {
   const { toast } = useToast();
   const [specifications, setSpecifications] = useState<SpecificationItem[]>([]);
-  const [subcategories, setSubcategories] = useState<SubcategoryItem[]>([]);
   const [activeCategory, setActiveCategory] = useState(
     SPECIFICATION_CATEGORIES[0],
   );
-  const [activeSubcategory, setActiveSubcategory] = useState<string | null>(
+  const [activeSpecification, setActiveSpecification] = useState<string | null>(
     null,
   );
   const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
   const [editContent, setEditContent] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [isAddingSubcategory, setIsAddingSubcategory] = useState(false);
-  const [newSubcategoryName, setNewSubcategoryName] = useState("");
+  const [isAddingSpecification, setIsAddingSpecification] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Fetch specifications for this company
   useEffect(() => {
     fetchSpecifications();
-    fetchSubcategories();
   }, [companyId]);
 
   const fetchSpecifications = async () => {
@@ -119,6 +112,7 @@ export default function CompanySpecifications({
           id: item.id,
           category: item.category,
           subcategory: item.subcategory || undefined,
+          title: item.title || undefined,
           content: item.content,
           updatedAt: new Date(item.updated_at),
         }));
@@ -136,82 +130,32 @@ export default function CompanySpecifications({
     }
   };
 
-  // Fetch subcategories for specifications
-  const fetchSubcategories = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("specification_subcategories")
-        .select("*")
-        .order("name", { ascending: true });
-
-      if (error) throw error;
-      setSubcategories(data || []);
-    } catch (error) {
-      console.error("Error fetching subcategories:", error);
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar las subcategorías",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Get the specification for the current active category and subcategory
-  const currentSpecification = specifications.find((spec) => {
-    if (activeSubcategory) {
-      return (
-        spec.category === activeCategory &&
-        spec.subcategory === activeSubcategory
-      );
-    }
-    return spec.category === activeCategory && !spec.subcategory;
-  });
-
-  // Get filtered subcategories for the current active category
-  const filteredSubcategories = subcategories.filter(
-    (subcat) => subcat.parent_category === activeCategory,
+  // Get specifications for the current active category
+  const categorySpecifications = specifications.filter(
+    (spec) => spec.category === activeCategory,
   );
 
+  // Get the currently selected specification
+  const currentSpecification = activeSpecification
+    ? specifications.find((spec) => spec.id === activeSpecification)
+    : null;
+
   const handleEditClick = () => {
+    setEditTitle(currentSpecification?.title || "");
     setEditContent(currentSpecification?.content || "");
+    setIsEditing(true);
+  };
+
+  const handleAddSpecification = () => {
+    setEditTitle("");
+    setEditContent("");
+    setIsAddingSpecification(true);
     setIsEditing(true);
   };
 
   const handleCancelEdit = () => {
     setIsEditing(false);
-  };
-
-  const handleAddSubcategory = async () => {
-    if (!newSubcategoryName.trim()) return;
-
-    try {
-      const { data, error } = await supabase
-        .from("specification_subcategories")
-        .insert({
-          name: newSubcategoryName.trim(),
-          parent_category: activeCategory,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setSubcategories([...subcategories, data]);
-      setNewSubcategoryName("");
-      setIsAddingSubcategory(false);
-
-      toast({
-        title: "Subcategoría añadida",
-        description: "La subcategoría ha sido añadida correctamente",
-      });
-    } catch (error) {
-      console.error("Error adding subcategory:", error);
-      toast({
-        title: "Error",
-        description: "No se pudo añadir la subcategoría",
-        variant: "destructive",
-      });
-    }
+    setIsAddingSpecification(false);
   };
 
   const handleDeleteSpecification = async () => {
@@ -230,6 +174,7 @@ export default function CompanySpecifications({
       setSpecifications(
         specifications.filter((spec) => spec.id !== currentSpecification.id),
       );
+      setActiveSpecification(null);
 
       toast({
         title: "Especificación eliminada",
@@ -252,11 +197,12 @@ export default function CompanySpecifications({
   const handleSaveSpecification = async () => {
     setIsSaving(true);
     try {
-      if (currentSpecification) {
+      if (!isAddingSpecification && currentSpecification) {
         // Update existing specification
         const { error } = await supabase
           .from("company_specifications")
           .update({
+            title: editTitle,
             content: editContent,
             updated_at: new Date().toISOString(),
           })
@@ -270,6 +216,7 @@ export default function CompanySpecifications({
             spec.id === currentSpecification.id
               ? {
                   ...spec,
+                  title: editTitle,
                   content: editContent,
                   updatedAt: new Date(),
                 }
@@ -288,7 +235,7 @@ export default function CompanySpecifications({
           .insert({
             company_id: companyId,
             category: activeCategory,
-            subcategory: activeSubcategory || undefined,
+            title: editTitle,
             content: editContent,
           })
           .select()
@@ -297,16 +244,16 @@ export default function CompanySpecifications({
         if (error) throw error;
 
         // Add to local state
-        setSpecifications([
-          ...specifications,
-          {
-            id: data.id,
-            category: data.category,
-            subcategory: data.subcategory || undefined,
-            content: data.content,
-            updatedAt: new Date(data.updated_at),
-          },
-        ]);
+        const newSpec = {
+          id: data.id,
+          category: data.category,
+          title: data.title || undefined,
+          content: data.content,
+          updatedAt: new Date(data.updated_at),
+        };
+
+        setSpecifications([...specifications, newSpec]);
+        setActiveSpecification(data.id);
 
         toast({
           title: "Especificación creada",
@@ -315,6 +262,7 @@ export default function CompanySpecifications({
       }
 
       setIsEditing(false);
+      setIsAddingSpecification(false);
     } catch (error) {
       console.error("Error saving specification:", error);
       toast({
@@ -329,48 +277,17 @@ export default function CompanySpecifications({
 
   return (
     <div className="space-y-6">
-      {/* Add Subcategory Dialog */}
-      <Dialog open={isAddingSubcategory} onOpenChange={setIsAddingSubcategory}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Añadir Subcategoría</DialogTitle>
-            <DialogDescription>
-              Cree una nueva subcategoría para {activeCategory}.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="subcategoryName">Nombre de la Subcategoría</Label>
-              <Input
-                id="subcategoryName"
-                value={newSubcategoryName}
-                onChange={(e) => setNewSubcategoryName(e.target.value)}
-                placeholder="Nombre de la subcategoría"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsAddingSubcategory(false)}
-            >
-              Cancelar
-            </Button>
-            <Button onClick={handleAddSubcategory}>Añadir</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">
           Especificaciones Particulares: {companyName}
         </h2>
         <div className="flex gap-2">
           {!isEditing && (
-            <Button onClick={() => setIsAddingSubcategory(true)}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Añadir Subcategoría
+            <Button onClick={handleAddSpecification}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Añadir Especificación
             </Button>
           )}
-          {!isEditing && (
+          {!isEditing && currentSpecification && (
             <Button onClick={handleEditClick}>
               <Edit className="mr-2 h-4 w-4" /> Editar
             </Button>
@@ -389,68 +306,88 @@ export default function CompanySpecifications({
       </div>
 
       <div className="flex gap-6">
-        {/* Lateral Categories Menu */}
+        {/* Left sidebar with categories and specifications */}
         <div className="w-64 shrink-0 space-y-4">
           <div className="bg-muted/20 rounded-md p-2">
-            <h3 className="font-medium mb-2 px-2">Categorías</h3>
+            <h3 className="font-medium mb-2 px-2">ESPECIFICACIONES</h3>
             <div className="space-y-1">
-              {SPECIFICATION_CATEGORIES.map((category) => (
-                <button
-                  key={category}
-                  onClick={() => {
-                    if (!isEditing) {
-                      setActiveCategory(category);
-                      setActiveSubcategory(null);
-                    }
-                  }}
-                  className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
-                    activeCategory === category && !activeSubcategory
-                      ? "bg-primary text-primary-foreground"
-                      : activeCategory === category
-                        ? "bg-primary/20 text-primary"
-                        : "hover:bg-muted"
-                  } ${isEditing ? "opacity-50 cursor-not-allowed" : ""}`}
-                  disabled={isEditing}
-                >
-                  {category}
-                </button>
-              ))}
+              {SPECIFICATION_CATEGORIES.map((category) => {
+                // Get specifications for this category
+                const categorySpecs = specifications.filter(
+                  (spec) => spec.category === category,
+                );
+
+                return (
+                  <div key={category} className="mb-2">
+                    <button
+                      onClick={() => {
+                        if (!isEditing) {
+                          setActiveCategory(category);
+                          setActiveSpecification(null);
+                        }
+                      }}
+                      className={`w-full text-left px-3 py-2 rounded-md text-sm font-semibold transition-colors ${
+                        activeCategory === category
+                          ? "bg-primary/20 text-primary"
+                          : "hover:bg-muted"
+                      } ${isEditing ? "opacity-50 cursor-not-allowed" : ""}`}
+                      disabled={isEditing}
+                    >
+                      {category.charAt(0).toUpperCase() +
+                        category.slice(1).toLowerCase()}
+                    </button>
+
+                    {/* Nested specifications under this category */}
+                    {activeCategory === category &&
+                      categorySpecs.length > 0 && (
+                        <div className="ml-3 mt-1 space-y-1 border-l-2 border-muted pl-2">
+                          {categorySpecs.map((spec) => (
+                            <button
+                              key={spec.id}
+                              onClick={() => {
+                                if (!isEditing) {
+                                  setActiveSpecification(spec.id);
+                                }
+                              }}
+                              className={`w-full text-left px-3 py-1.5 rounded-md text-sm transition-colors ${
+                                activeSpecification === spec.id
+                                  ? "bg-primary text-primary-foreground"
+                                  : "hover:bg-muted"
+                              } ${isEditing ? "opacity-50 cursor-not-allowed" : ""}`}
+                              disabled={isEditing}
+                            >
+                              {spec.title || "Sin título"}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                  </div>
+                );
+              })}
             </div>
           </div>
-
-          {filteredSubcategories.length > 0 && (
-            <div className="bg-muted/20 rounded-md p-2">
-              <h3 className="font-medium mb-2 px-2">
-                Subcategorías de {activeCategory}
-              </h3>
-              <div className="space-y-1">
-                {filteredSubcategories.map((subcat) => (
-                  <button
-                    key={subcat.id}
-                    onClick={() => {
-                      if (!isEditing) {
-                        setActiveSubcategory(subcat.id);
-                      }
-                    }}
-                    className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
-                      activeSubcategory === subcat.id
-                        ? "bg-primary text-primary-foreground"
-                        : "hover:bg-muted"
-                    } ${isEditing ? "opacity-50 cursor-not-allowed" : ""}`}
-                    disabled={isEditing}
-                  >
-                    {subcat.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Content Area */}
         <div className="flex-1">
+          <div className="bg-muted/10 p-2 mb-4 rounded-md">
+            <h3 className="font-medium">CONTENIDO DE LA ESPECIFICACIÓN</h3>
+          </div>
+
           {isEditing ? (
             <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="specificationTitle">
+                  Título de la Especificación
+                </Label>
+                <Input
+                  id="specificationTitle"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  placeholder="Título de la especificación"
+                  className="w-full"
+                />
+              </div>
               <Card>
                 <CardContent className="p-4">
                   <ReactQuill
@@ -483,27 +420,33 @@ export default function CompanySpecifications({
                 Cargando especificaciones...
               </p>
             </div>
-          ) : specifications.some(
-              (spec) => spec.category === activeCategory,
-            ) ? (
+          ) : currentSpecification ? (
             <Card>
               <CardContent className="p-6">
+                {currentSpecification.title && (
+                  <h3 className="text-xl font-bold mb-4">
+                    {currentSpecification.title}
+                  </h3>
+                )}
                 <div
                   className="prose max-w-none"
                   dangerouslySetInnerHTML={{
-                    __html:
-                      specifications.find(
-                        (spec) => spec.category === activeCategory,
-                      )?.content || "",
+                    __html: currentSpecification.content || "",
                   }}
                 />
               </CardContent>
             </Card>
+          ) : activeCategory && categorySpecifications.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">
+                No hay especificaciones para {activeCategory}. Haga clic en
+                "Añadir Especificación" para crear una nueva.
+              </p>
+            </div>
           ) : (
             <div className="text-center py-12">
               <p className="text-muted-foreground">
-                No hay especificaciones para esta categoría. Haga clic en
-                "Editar" para añadir contenido.
+                Seleccione una especificación para ver su contenido.
               </p>
             </div>
           )}
